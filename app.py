@@ -7,7 +7,6 @@ Web UI + SSE streaming.  Gunicorn: 6 workers, gthread class.
 import json
 import os
 import queue as q_mod
-import random
 import threading
 import time
 import uuid
@@ -155,6 +154,17 @@ def _scan_worker(
         semaphore = threading.Semaphore(num_threads)
         idid      = session_id()
 
+        # ── Strict round-robin domain rotator (thread-safe) ───────────────────
+        _rr_index = 0
+        _rr_lock  = threading.Lock()
+
+        def _next_domain() -> str:
+            nonlocal _rr_index
+            with _rr_lock:
+                domain = domains[_rr_index % len(domains)]
+                _rr_index += 1
+            return domain
+
         def check_one(card_tuple: tuple, domain: str) -> None:
             # Use user-supplied proxy if provided, otherwise fall back to proxyverse
             if user_proxy:
@@ -253,7 +263,7 @@ def _scan_worker(
 
         threads = []
         for card_tuple in cards:
-            domain = random.choice(domains)
+            domain = _next_domain()
             semaphore.acquire()
             t = threading.Thread(
                 target=check_one,
