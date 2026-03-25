@@ -1,0 +1,26 @@
+[Unit]
+Description=AuthNet Card Checker — port 5052
+After=network.target
+
+[Service]
+Type=simple
+User=administrator
+Group=www-data
+WorkingDirectory=/var/www/html/chkr
+ExecStart=/home/administrator/.local/bin/gunicorn app:app \
+    --bind 127.0.0.1:5052 \
+    --workers 6 \
+    --worker-class gthread \
+    --threads 2 \
+    --timeout 180 \
+    --keep-alive 5 \
+    --access-logfile - \
+    --error-logfile -
+Environment=PYTHONUNBUFFERED=1
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

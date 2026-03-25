@@ -1,0 +1,21 @@
+# Sensitive / generated — never commit
+cards/
+cookies/
+authnet.txt
+ppcp.txt
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Logs & temp files
+*.log
+*.tmp
+
+# Server-local config overrides
+*.local
+
+# IDE
+.vscode/
+.idea/

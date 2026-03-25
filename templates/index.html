@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="theme-color" content="#121212">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <title>EONX — CHK</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background-color: #121212;
+      background-image: url('{{ url_for("static", filename="blackbg.jpg") }}');
+      background-size: cover;
+      background-position: center center;
+      background-attachment: fixed;
+      background-repeat: no-repeat;
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 1rem;
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    a { color: #58a6ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ----- Layout ----- */
+    .container { width: 100%; max-width: 1140px; margin: 0 auto; padding: 0 15px; }
+    .py-4 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+    .row { display: flex; flex-wrap: wrap; margin: 0 -15px 1.5rem; }
+    .col-12, .col-md-4, .col-md-8 { position: relative; width: 100%; padding: 0 15px; }
+    .col-12 { flex: 0 0 100%; max-width: 100%; }
+    @media (min-width: 768px) {
+      .col-md-4 { flex: 0 0 33.333%; max-width: 33.333%; }
+      .col-md-8 { flex: 0 0 66.667%; max-width: 66.667%; }
+    }
+    .mb-2 { margin-bottom: .5rem; }
+    .mb-3 { margin-bottom: 1rem; }
+    .mb-4 { margin-bottom: 1.5rem; }
+    .mt-4 { margin-top: 1rem; }
+    .my-0 { margin-top: 0; margin-bottom: 0; }
+    .d-flex { display: flex; }
+    .flex-column { flex-direction: column; }
+    .align-items-center { align-items: center; }
+    .justify-content-between { justify-content: space-between; }
+    .justify-content-around { justify-content: space-around; }
+    .text-center { text-align: center; }
+    .font-weight-bold { font-weight: 700; }
+    .mr-2 { margin-right: .5rem; }
+    .h5 { font-size: 1.25rem; font-weight: 500; }
+    .main-content { flex: 1; }
+    .sticky-stats { position: sticky; top: 1rem; align-self: flex-start; }
+
+    /* ----- Card (glassmorphism) ----- */
+    .card {
+      background: rgba(30,30,30,.65);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,.15);
+      box-shadow: 0 8px 32px rgba(0,0,0,.37);
+      border-radius: .25rem;
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 1rem;
+      color: #e0e0e0;
+    }
+    .card-header {
+      padding: .75rem 1.25rem;
+      border-bottom: 1px solid rgba(255,255,255,.15);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card-header.h5 { justify-content: space-between; align-items: center; font-size: 1.25rem; font-weight: bold; }
+    .card-body { flex: 1 1 auto; padding: 1.25rem; }
+    .card-title { font-size: 1.1rem; font-weight: 700; color: #e0e0e0; }
+
+    /* ----- Form ----- */
+    .form-control, .md-textarea {
+      display: block; width: 100%;
+      padding: .375rem .75rem;
+      font-size: 1rem; line-height: 1.5;
+      color: #f8f9fa !important;
+      background: rgba(46,46,46,.5) !important;
+      backdrop-filter: blur(2px);
+      border: 1px solid rgba(255,255,255,.2) !important;
+      border-radius: .25rem;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .md-textarea { height: auto; resize: vertical; }
+    .form-control:focus, .md-textarea:focus {
+      color: #f8f9fa !important;
+      background: rgba(46,46,46,.7) !important;
+      border-color: rgba(0,123,255,.5) !important;
+      outline: none;
+      box-shadow: 0 0 0 .2rem rgba(0,123,255,.25) !important;
+    }
+    select.form-control option { background: #1e1e1e; color: #e0e0e0; }
+
+    /* Floating label */
+    .floating-label-group { position: relative; margin-top: 1.2rem; width: 100%; text-align: center; }
+    .floating-label-group textarea { padding-top: 1.5rem; text-align: center; }
+    .floating-label-group label {
+      position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+      font-size: 16px; color: #999; pointer-events: none;
+      transition: all .2s ease; padding: 0 5px; white-space: nowrap;
+    }
+    .floating-label-group.focused label,
+    .floating-label-group.filled label { top: -8px; font-size: 12px; color: #ccc; }
+
+    /* Domain label group (left-aligned) */
+    .domain-label-group { position: relative; margin-top: 1.2rem; width: 100%; }
+    .domain-label-group textarea { padding-top: 1.5rem; }
+    .domain-label-group label {
+      position: absolute; top: 14px; left: .75rem;
+      font-size: 14px; color: #999; pointer-events: none;
+      transition: all .2s ease;
+    }
+    .domain-label-group.focused label,
+    .domain-label-group.filled label { top: -8px; font-size: 12px; color: #ccc; }
+
+    /* Thread slider */
+    .slider-row { display: flex; align-items: center; gap: .75rem; margin-top: .5rem; }
+    .slider-row input[type=range] { flex: 1; accent-color: #007bff; }
+    .slider-val { font-size: .9rem; color: #aaa; min-width: 24px; text-align: right; }
+
+    /* ----- Buttons ----- */
+    .btn {
+      display: inline-block; font-weight: 400; text-align: center;
+      vertical-align: middle; user-select: none;
+      border: 1px solid transparent;
+      padding: .375rem .75rem; font-size: 1rem; line-height: 1.5;
+      border-radius: .25rem; cursor: pointer;
+      transition: all .2s ease;
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      min-width: 200px;
+    }
+    .btn:focus { outline: none; box-shadow: 0 0 0 .2rem rgba(0,123,255,.25); }
+    .btn-primary { color:#fff; background:rgba(0,123,255,.25); border-color:rgba(0,123,255,.4); }
+    .btn-primary:hover { background:rgba(0,123,255,.4); border-color:rgba(0,123,255,.6); box-shadow:0 0 8px rgba(0,123,255,.6); transform:translateY(-1px); }
+    .btn-danger  { color:#fff; background:rgba(220,53,69,.25); border-color:rgba(220,53,69,.4); }
+    .btn-danger:hover  { background:rgba(220,53,69,.4); border-color:rgba(220,53,69,.6); box-shadow:0 0 8px rgba(220,53,69,.5); transform:scale(1.02); }
+    .btn-sm { padding:.25rem .5rem; font-size:.875rem; border-radius:.2rem; min-width:unset; }
+    .btn-outline-secondary {
+      color:#ccc; border-color:rgba(108,117,125,.5); background:rgba(108,117,125,.1);
+      min-width:unset;
+    }
+    .btn-outline-secondary:hover { color:#fff; background:rgba(108,117,125,.3); box-shadow:0 0 6px rgba(108,117,125,.5); transform:translateY(-1px); }
+
+    /* ----- Badges ----- */
+    .badge {
+      display:inline-block; padding:.25em .4em; font-size:75%; font-weight:700;
+      line-height:1; text-align:center; white-space:nowrap; vertical-align:baseline;
+      border-radius:.25rem; backdrop-filter:blur(5px); border:1px solid transparent;
+      text-shadow:0 0 3px rgba(0,0,0,.5);
+    }
+    .badge-primary { color:#fff; background:rgba(0,105,217,.25); border-color:rgba(0,105,217,.4); }
+    .badge-success { color:#fff; background:rgba(33,136,56,.3);   border-color:rgba(33,136,56,.5); }
+    .badge-danger  { color:#fff; background:rgba(200,35,51,.25);  border-color:rgba(200,35,51,.4); }
+    .badge-warning { color:#ffdd70; background:rgba(255,193,7,.25); border-color:rgba(255,193,7,.4); }
+    .badge-info    { color:#fff; background:rgba(19,132,150,.3);  border-color:rgba(19,132,150,.5); }
+
+    /* ----- Gateway pills ----- */
+    .gw-pills { display:flex; gap:.5rem; }
+    .gw-pill {
+      padding:.2rem .85rem; border-radius:999px; font-size:.78rem; font-weight:600;
+      cursor:pointer; border:1px solid rgba(255,255,255,.18);
+      background:rgba(255,255,255,.05); color:#aaa;
+      transition:all .18s ease; user-select:none;
+    }
+    .gw-pill.active-authnet { background:rgba(0,123,255,.25); border-color:rgba(0,123,255,.5); color:#fff; box-shadow:0 0 8px rgba(0,123,255,.35); }
+    .gw-pill.active-ppcp    { background:rgba(0,150,220,.25); border-color:rgba(0,150,220,.5); color:#fff; box-shadow:0 0 8px rgba(0,150,220,.35); }
+    .gw-pill:not(.active-authnet):not(.active-ppcp):hover { background:rgba(255,255,255,.1); color:#ddd; }
+
+    /* ----- Result panels ----- */
+    .result-body { display:none; word-break:break-all; font-size:.82rem; line-height:1.9; }
+    .result-body .line-live    { color:#4caf50; }
+    .result-body .line-dead    { color:#ef5350; }
+    .result-body .line-unknown { color:#ffc107; }
+
+    /* ----- Progress bar ----- */
+    .progress-wrap { height:4px; background:rgba(255,255,255,.1); border-radius:2px; margin-top:.75rem; overflow:hidden; }
+    .progress-bar  { height:100%; width:0; background:#007bff; border-radius:2px; transition:width .3s; }
+
+    /* ----- Toast ----- */
+    #toast {
+      position:fixed; bottom:1.5rem; right:1.5rem; z-index:9000;
+      padding:.6rem 1.1rem; border-radius:.3rem; font-size:.88rem;
+      backdrop-filter:blur(8px); border:1px solid transparent;
+      opacity:0; transition:opacity .25s; pointer-events:none;
+    }
+    #toast.show { opacity:1; }
+    #toast.ok   { background:rgba(33,136,56,.75); border-color:rgba(33,136,56,.9); color:#fff; }
+    #toast.warn { background:rgba(200,150,0,.75); border-color:rgba(200,150,0,.9); color:#fff; }
+    #toast.err  { background:rgba(200,35,51,.75);  border-color:rgba(200,35,51,.9); color:#fff; }
+
+    /* ----- Footer ----- */
+    .footer-copyright {
+      background:rgba(30,30,30,.7); backdrop-filter:blur(5px);
+      border-top:1px solid rgba(255,255,255,.15);
+      color:#888; padding:1rem 0; text-align:center; margin-top:auto;
+    }
+
+    /* ----- Scrollbar ----- */
+    ::-webkit-scrollbar { width:8px; height:8px; }
+    ::-webkit-scrollbar-track { background:#1e1e1e; }
+    ::-webkit-scrollbar-thumb { background:#555; border-radius:10px; border:2px solid #1e1e1e; }
+    ::-webkit-scrollbar-thumb:hover { background:#888; }
+
+    /* ----- Mobile ----- */
+    @media (max-width:768px) {
+      .btn.btn-primary, .btn.btn-danger { min-width:unset; width:100%; margin-top:.5rem; }
+      .d-flex.justify-content-around { flex-direction:column; }
+      .card-header:not(.h5) { flex-wrap:wrap; gap:.5rem; }
+      .sticky-stats { position:static; }
+    }
+    @media (prefers-reduced-motion:reduce) {
+      *, *::before, *::after { animation-duration:.01ms!important; transition-duration:.01ms!important; }
+    }
+  </style>
+</head>
+
+<body>
+<div class="container py-4">
+
+  <!-- Row 1: Input + Stats -->
+  <div class="row">
+    <!-- Input card -->
+    <div class="col-12 col-md-8 mb-4 main-content">
+      <div class="card">
+        <div class="card-header h5">
+          <span>CARD CHECKER</span>
+          <div class="gw-pills">
+            <span class="gw-pill active-authnet" id="pillAuthnet" onclick="setGateway('authnet')">AUTHNET</span>
+            <span class="gw-pill" id="pillPpcp" onclick="setGateway('ppcp')">PPCP</span>
+          </div>
+        </div>
+        <div class="card-body">
+
+          <!-- Cards textarea -->
+          <div class="floating-label-group" id="cardGroup">
+            <textarea id="lista" class="md-textarea form-control" rows="4"
+              autocomplete="off" autocorrect="off" autocapitalize="off"
+              remove-duplicate="true" spellcheck="false"
+              aria-label="Card input field"></textarea>
+            <label for="lista" id="lista-label">Enter cards here…</label>
+          </div>
+
+          <!-- Domains textarea -->
+          <div class="domain-label-group mt-4" id="domainGroup">
+            <textarea id="domainInput" class="md-textarea form-control" rows="3"
+              autocomplete="off" spellcheck="false"
+              aria-label="Domain input field"></textarea>
+            <label for="domainInput">Domains (one per line) — leave blank to use saved sites</label>
+          </div>
+
+          <!-- Custom proxy input -->
+          <div style="margin-top:1rem;">
+            <div style="font-size:.85rem;color:#aaa;margin-bottom:.4rem;">Custom Proxy <span style="font-size:.75rem;color:#666;">(optional — leave blank to use default)</span></div>
+            <input type="text" id="proxyInput" class="form-control"
+              placeholder="host:port  or  user:pass@host:port  or  http://user:pass@host:port"
+              autocomplete="off" spellcheck="false"
+              style="font-size:.82rem;">
+          </div>
+
+          <!-- Thread slider -->
+          <div style="margin-top:1rem;">
+            <div style="font-size:.85rem;color:#aaa;margin-bottom:.25rem;">
+              Concurrent workers: <span id="threadVal">3</span>
+            </div>
+            <div class="slider-row">
+              <input type="range" id="threadSlider" min="1" max="5" value="3"
+                oninput="document.getElementById('threadVal').textContent=this.value">
+            </div>
+          </div>
+
+          <!-- Progress bar -->
+          <div class="progress-wrap mt-4"><div class="progress-bar" id="progressBar"></div></div>
+
+          <!-- Buttons -->
+          <div class="d-flex justify-content-around mt-4">
+            <button class="btn btn-primary" id="btnStart" onclick="startScan()" aria-label="Start">START</button>
+            <button class="btn btn-danger"  id="btnStop"  onclick="stopScan()"  aria-label="Stop">STOP</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats sidebar -->
+    <div class="col-12 col-md-4 mb-4 sticky-stats">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span>Status :</span>
+              <span id="status" class="badge badge-primary" aria-live="polite">Idle</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span>Live :</span>
+              <span id="cLive" class="badge badge-success" aria-live="polite">0</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span>Dead :</span>
+              <span id="cDead" class="badge badge-danger" aria-live="polite">0</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span>Error :</span>
+              <span id="cError" class="badge badge-warning">0</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span>Processed :</span>
+              <span id="cDone" class="badge badge-info" aria-live="polite">0</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span>Total Cards :</span>
+              <span id="cTotal" class="badge badge-primary" aria-live="polite">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /row 1 -->
+
+  <!-- LIVE panel -->
+  <div class="row mb-3">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h6 class="card-title font-weight-bold my-0">
+            LIVE &nbsp;<span id="cLive2" class="badge badge-success" aria-live="polite">0</span>
+          </h6>
+          <div class="d-flex">
+            <button class="btn btn-outline-secondary btn-sm mr-2"
+              onclick="copyCards('live')" title="Copy live cards" aria-label="Copy live cards">
+              <i class="fa-solid fa-copy"></i>
+            </button>
+            <button id="mostra" class="btn btn-primary btn-sm"
+              aria-expanded="false" aria-controls="bode">
+              <i class="fa-solid fa-eye"></i>
+            </button>
+          </div>
+        </div>
+        <div id="bode" class="card-body result-body"><span class="aprovadas"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEAD panel -->
+  <div class="row mb-3">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h6 class="card-title font-weight-bold my-0">
+            DEAD &nbsp;<span id="cDead2" class="badge badge-danger" aria-live="polite">0</span>
+          </h6>
+          <div class="d-flex">
+            <button class="btn btn-outline-secondary btn-sm mr-2"
+              onclick="copyCards('dead')" title="Copy dead cards" aria-label="Copy dead cards">
+              <i class="fa-solid fa-copy"></i>
+            </button>
+            <button id="mostra2" class="btn btn-primary btn-sm"
+              aria-expanded="false" aria-controls="bode2">
+              <i class="fa-solid fa-eye"></i>
+            </button>
+          </div>
+        </div>
+        <div id="bode2" class="card-body result-body"><span class="reprovadas"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ERROR panel -->
+  <div class="row mb-3">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h6 class="card-title font-weight-bold my-0">
+            ERROR &nbsp;<span id="cError2" class="badge badge-warning" aria-live="polite">0</span>
+          </h6>
+          <div class="d-flex">
+            <button class="btn btn-outline-secondary btn-sm mr-2"
+              onclick="copyCards('error')" title="Copy error cards" aria-label="Copy error cards">
+              <i class="fa-solid fa-copy"></i>
+            </button>
+            <button id="mostra3" class="btn btn-primary btn-sm"
+              aria-expanded="false" aria-controls="bode3">
+              <i class="fa-solid fa-eye"></i>
+            </button>
+          </div>
+        </div>
+        <div id="bode3" class="card-body result-body"><span class="none"></span></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<footer class="footer-copyright">
+  v1.0 &mdash;
+  <a href="https://t.me/eonara" target="_blank" rel="noopener noreferrer">EONARA</a> &copy; 2025
+</footer>
+
+<div id="toast"></div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let _jobId   = null;
+let _evtSrc  = null;
+let _running = false;
+let _liveLines = [], _deadLines = [], _errLines = [];
+let _gateway = 'authnet';
+
+// ─── Gateway selector ───────────────────────────────────────────────────────────
+const _GW_DOMAIN_HINTS = {
+  authnet: 'AuthNet stores (one per line) — leave blank to use saved sites',
+  ppcp:    'PPCP / PayPal stores (one per line) — leave blank to use saved sites',
+};
+function setGateway(gw) {
+  _gateway = gw;
+  ['authnet','ppcp'].forEach(g => {
+    const pill = document.getElementById('pill' + g.charAt(0).toUpperCase() + g.slice(1));
+    if (pill) pill.className = 'gw-pill' + (g === gw ? ' active-' + g : '');
+  });
+  const lbl = document.querySelector('#domainGroup label');
+  if (lbl) lbl.textContent = _GW_DOMAIN_HINTS[gw] || _GW_DOMAIN_HINTS.authnet;
+  try { sessionStorage.setItem('chkr_gateway', gw); } catch(e) {}
+}
+
+// ─── Persistent session token (survives page refresh, unique per browser) ────
+function _getClientToken() {
+  let t = localStorage.getItem('chkr_token');
+  if (!t) {
+    t = Array.from(crypto.getRandomValues(new Uint8Array(20)))
+             .map(b => b.toString(16).padStart(2,'0')).join('');
+    localStorage.setItem('chkr_token', t);
+  }
+  return t;
+}
+
+// ─── Toast ───────────────────────────────────────────────────────────────────
+let _toastTimer = null;
+function toast(msg, type = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { t.className = ''; }, 3000);
+}
+
+// ─── Toggle panels (eye icon) ─────────────────────────────────────────────────
+[['mostra','bode'],['mostra2','bode2'],['mostra3','bode3']].forEach(([btnId, panelId]) => {
+  const btn   = document.getElementById(btnId);
+  const panel = document.getElementById(panelId);
+  panel.style.display = 'none';
+  btn.addEventListener('click', () => {
+    const visible = panel.style.display !== 'none';
+    panel.style.display = visible ? 'none' : 'block';
+    const icon = btn.querySelector('i');
+    if (icon) {
+      icon.classList.toggle('fa-eye',       visible);
+      icon.classList.toggle('fa-eye-slash', !visible);
+    }
+    btn.setAttribute('aria-expanded', String(!visible));
+  });
+});
+
+// ─── Floating labels ──────────────────────────────────────────────────────────
+function initFloating(groupId, inputId) {
+  const grp   = document.getElementById(groupId);
+  const input = document.getElementById(inputId);
+  if (!grp || !input) return;
+  const update = () => grp.classList.toggle('filled', input.value.trim() !== '');
+  input.addEventListener('focus', () => grp.classList.add('focused'));
+  input.addEventListener('blur',  () => { grp.classList.remove('focused'); update(); });
+  input.addEventListener('input', update);
+  update();
+}
+initFloating('cardGroup',   'lista');
+initFloating('domainGroup', 'domainInput');
+
+// ─── localStorage persistence ─────────────────────────────────────────────────
+function saveSession() {
+  try {
+    sessionStorage.setItem('chkr_cards',   document.getElementById('lista').value);
+    sessionStorage.setItem('chkr_domains', document.getElementById('domainInput').value);
+    sessionStorage.setItem('chkr_threads', document.getElementById('threadSlider').value);
+    sessionStorage.setItem('chkr_proxy',   document.getElementById('proxyInput').value);
+  } catch(e) {}
+}
+function loadSession() {
+  try {
+    const c = sessionStorage.getItem('chkr_cards');
+    const d = sessionStorage.getItem('chkr_domains');
+    const t = sessionStorage.getItem('chkr_threads');
+    const p = sessionStorage.getItem('chkr_proxy');
+    const gw = sessionStorage.getItem('chkr_gateway');
+    if (c) document.getElementById('lista').value = c;
+    if (d) document.getElementById('domainInput').value = d;
+    if (t) {
+      document.getElementById('threadSlider').value = t;
+      document.getElementById('threadVal').textContent = t;
+    }
+    if (p) document.getElementById('proxyInput').value = p;
+    if (gw && (gw === 'authnet' || gw === 'ppcp')) setGateway(gw);
+    ['cardGroup','domainGroup'].forEach(id => {
+      const grp = document.getElementById(id);
+      const inp = grp && grp.querySelector('textarea');
+      if (inp && inp.value.trim()) grp.classList.add('filled');
+    });
+  } catch(e) {}
+}
+loadSession();
+document.getElementById('lista').addEventListener('input', saveSession);
+document.getElementById('domainInput').addEventListener('input', saveSession);
+document.getElementById('threadSlider').addEventListener('input', saveSession);
+document.getElementById('proxyInput').addEventListener('input', saveSession);
+
+// ─── Remove checked card from textarea ───────────────────────────────────────
+function removeCard(card) {
+  const ta = document.getElementById('lista');
+  // match by the card number (first segment before |) to handle yy/yyyy variants
+  const ccNum = card.split('|')[0].trim();
+  const lines = ta.value.split('\n');
+  const idx = lines.findIndex(l => l.split('|')[0].trim() === ccNum);
+  if (idx !== -1) lines.splice(idx, 1);
+  ta.value = lines.join('\n');
+  // update filled state
+  const grp = document.getElementById('cardGroup');
+  if (grp) grp.classList.toggle('filled', ta.value.trim() !== '');
+  saveSession();
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function setText(id, v) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = v;
+}
+function setStatus(text, badgeClass) {
+  const el = document.getElementById('status');
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'badge ' + (badgeClass || 'badge-primary');
+}
+function setProgress(done, total) {
+  const pct = total > 0 ? Math.round(done / total * 100) : 0;
+  document.getElementById('progressBar').style.width = pct + '%';
+}
+
+// ─── Append result lines ─────────────────────────────────────────────────────
+function appendLine(spanClass, cssClass, html) {
+  const span = document.querySelector('.' + spanClass);
+  if (span) span.innerHTML += '<span class="' + cssClass + '">' + html + '</span><br>';
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function decodeHtmlEntities(s) {
+  const txt = document.createElement('textarea');
+  txt.innerHTML = s;
+  return txt.value;
+}
+
+// ─── START ───────────────────────────────────────────────────────────────────
+async function startScan() {
+  if (_running) { toast('Already running.', 'warn'); return; }
+
+  const cards   = document.getElementById('lista').value.trim();
+  const domains = document.getElementById('domainInput').value.trim();
+  const threads = parseInt(document.getElementById('threadSlider').value) || 5;
+
+  if (!cards)   { toast('Paste cards first.', 'warn'); return; }
+  if (!domains) { toast('Paste at least one domain.', 'warn'); return; }
+
+  // Reset UI
+  _liveLines = []; _deadLines = []; _errLines = [];
+  document.querySelector('.aprovadas').innerHTML = '';
+  document.querySelector('.reprovadas').innerHTML = '';
+  document.querySelector('.none').innerHTML = '';
+  ['cLive','cDead','cError','cDone','cTotal','cLive2','cDead2','cError2'].forEach(id => setText(id, '0'));
+  setProgress(0, 1);
+  setStatus('Starting…', 'badge-info');
+
+  const proxy = document.getElementById('proxyInput').value.trim();
+  const clientToken = _getClientToken();
+  const gateway = _gateway;
+
+  let res, data;
+  try {
+    res  = await fetch('/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cards, domains, threads, client_token: clientToken, gateway, ...(proxy ? { proxy } : {}) }),
+    });
+    data = await res.json();
+  } catch(e) {
+    toast('Network error: ' + e.message, 'err');
+    setStatus('Error', 'badge-danger');
+    return;
+  }
+
+  if (!res.ok || data.error) {
+    toast(data.error || 'Server error', 'err');
+    setStatus('Error', 'badge-danger');
+    return;
+  }
+
+  _jobId   = data.job_id;
+  _running = true;
+  const total = data.total;
+  setText('cTotal', total);
+  setStatus('Running…', 'badge-info');
+
+  // SSE stream
+  _evtSrc = new EventSource('/stream/' + _jobId);
+
+  _evtSrc.onmessage = (e) => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
+
+    if (msg.type === 'ping') return;
+
+    if (msg.type === 'result') {
+      try {
+        removeCard(msg.card);
+        const card    = esc(msg.card    || '');
+        const message = esc(msg.message || '');
+        const amount  = msg.amount ? ' <span style="color:#aaa">(' + esc(decodeHtmlEntities(msg.amount)) + ')</span>' : '';
+        const domain  = msg.domain ? ' <span style="color:#64b5f6;font-size:.75em">' + esc(msg.domain) + '</span>' : '';
+
+        setProgress(msg.done, msg.total);
+        setText('cDone',   msg.done);
+        setText('cLive',   msg.live);
+        setText('cDead',   msg.dead);
+        setText('cError',  msg.unknown);
+        setText('cLive2',  msg.live);
+        setText('cDead2',  msg.dead);
+        setText('cError2', msg.unknown);
+        setStatus('Running… ' + msg.done + '/' + msg.total, 'badge-info');
+
+        if (msg.status === 'live') {
+          const binInfo = msg.bin_info ? ' <span style="color:#b0bec5;font-size:.75em">[' + esc(msg.bin_info) + ']</span>' : '';
+          const line = card + ' ✅ ' + message + amount + binInfo + domain;
+          const copyBin = msg.bin_info ? ' [' + msg.bin_info + ']' : '';
+          _liveLines.push(msg.card + (msg.amount ? ' =>> ' + msg.amount : '') + copyBin + ' | ' + (msg.domain||''));
+          appendLine('aprovadas', 'line-live', line);
+        } else if (msg.status === 'dead') {
+          const line = card + ' ❌ ' + message + amount + domain;
+          _deadLines.push(msg.card);
+          appendLine('reprovadas', 'line-dead', line);
+        } else {
+          const line = card + ' ⚠️ ' + message + domain;
+          _errLines.push(msg.card);
+          appendLine('none', 'line-unknown', line);
+        }
+      } catch(err) {
+        console.error('Result handler error:', err, msg);
+      }
+    }
+
+    if (msg.type === 'done') {
+      _running = false;
+      _evtSrc.close();
+      setProgress(msg.total, msg.total);
+      setStatus('Completed', 'badge-success');
+      toast('Done — Live: ' + msg.live + '  Dead: ' + msg.dead + '  Error: ' + msg.unknown, 'ok');
+    }
+  };
+
+  _evtSrc.onerror = () => {
+    if (!_running) return;
+    _running = false;
+    _evtSrc.close();
+    setStatus('Stream error', 'badge-danger');
+    toast('SSE connection lost.', 'err');
+  };
+}
+
+// ─── STOP ────────────────────────────────────────────────────────────────────
+async function stopScan() {
+  if (!_running || !_jobId) return;
+  try { await fetch('/stop/' + _jobId, { method: 'POST' }); } catch {}
+  _running = false;
+  if (_evtSrc) { _evtSrc.close(); _evtSrc = null; }
+  setStatus('Stopped', 'badge-warning');
+  toast('Stopped.', 'warn');
+}
+
+// ─── COPY ────────────────────────────────────────────────────────────────────
+async function copyCards(type) {
+  let lines, label;
+  if (type === 'live')  { lines = _liveLines; label = 'LIVE'; }
+  else if (type === 'dead') { lines = _deadLines; label = 'DEAD'; }
+  else                  { lines = _errLines;  label = 'ERROR'; }
+
+  if (!lines.length) { toast(label + ' is empty.', 'warn'); return; }
+  const text = lines.join('\n');
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    toast('Copied ' + lines.length + ' ' + label + ' card(s)!', 'ok');
+  } catch(e) { toast('Copy failed: ' + e.message, 'err'); }
+}
+
+// ─── Keyboard shortcut ───────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); startScan(); }
+});
+
+// ─── FOUC guard ──────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => document.body.style.opacity = '1');
+document.body.style.opacity = '0';
+document.body.style.transition = 'opacity .2s';
+setTimeout(() => document.body.style.opacity = '1', 50);
+</script>
+</body>
+</html>
