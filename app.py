@@ -166,6 +166,10 @@ def _scan_worker(
             return domain
 
         def check_one(card_tuple: tuple, domain: str) -> None:
+            # Bail immediately if the job was stopped before this thread ran
+            if job.get("stop"):
+                semaphore.release()
+                return
             # Use user-supplied proxy if provided, otherwise fall back to proxyverse
             if user_proxy:
                 sess = build_session_from_str(user_proxy)
@@ -263,8 +267,13 @@ def _scan_worker(
 
         threads = []
         for card_tuple in cards:
+            if job.get("stop"):
+                break
             domain = _next_domain()
             semaphore.acquire()
+            if job.get("stop"):
+                semaphore.release()
+                break
             t = threading.Thread(
                 target=check_one,
                 args=(card_tuple, domain),
