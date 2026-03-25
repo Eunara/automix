@@ -246,9 +246,15 @@
           <div class="floating-label-group" id="cardGroup">
             <textarea id="lista" class="md-textarea form-control" rows="4"
               autocomplete="off" autocorrect="off" autocapitalize="off"
-              remove-duplicate="true" spellcheck="false"
+              spellcheck="false"
               aria-label="Card input field"></textarea>
             <label for="lista" id="lista-label">Enter cards here…</label>
+          </div>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:.5rem;margin-top:.3rem;">
+            <span id="cardCountBadge" style="font-size:.75rem;color:#888;">0 cards</span>
+            <button class="btn btn-outline-secondary btn-sm" onclick="dedupeCards()" title="Remove duplicates" style="font-size:.72rem;padding:.15rem .45rem;">
+              <i class="fa-solid fa-filter"></i> Dedupe
+            </button>
           </div>
 
           <!-- Domains textarea -->
@@ -414,6 +420,7 @@ let _evtSrc  = null;
 let _running = false;
 let _liveLines = [], _deadLines = [], _errLines = [];
 let _gateway = 'authnet';
+let _liveOpened = false;
 
 // ─── Gateway selector ───────────────────────────────────────────────────────────
 const _GW_DOMAIN_HINTS = {
@@ -515,12 +522,41 @@ function loadSession() {
   } catch(e) {}
 }
 loadSession();
-document.getElementById('lista').addEventListener('input', saveSession);
+updateCardCount();
+document.getElementById('lista').addEventListener('input', () => { saveSession(); updateCardCount(); });
+
 document.getElementById('domainInput').addEventListener('input', saveSession);
 document.getElementById('threadSlider').addEventListener('input', saveSession);
 document.getElementById('proxyInput').addEventListener('input', saveSession);
 
-// ─── Remove checked card from textarea ───────────────────────────────────────
+// ─── Card count & dedupe ─────────────────────────────────────────────────────
+function updateCardCount() {
+  const ta    = document.getElementById('lista');
+  const lines = ta.value.split('\n').filter(l => l.trim().length > 0);
+  const badge = document.getElementById('cardCountBadge');
+  if (badge) badge.textContent = lines.length + ' card' + (lines.length !== 1 ? 's' : '');
+}
+
+function dedupeCards() {
+  const ta    = document.getElementById('lista');
+  const lines = ta.value.split('\n');
+  const seen  = new Set();
+  const deduped = lines.filter(l => {
+    const cc = l.split('|')[0].trim();
+    if (!cc) return false;
+    if (seen.has(cc)) return false;
+    seen.add(cc);
+    return true;
+  });
+  const before = lines.filter(l => l.trim()).length;
+  ta.value = deduped.join('\n');
+  updateCardCount();
+  saveSession();
+  const removed = before - deduped.length;
+  toast(removed > 0 ? 'Removed ' + removed + ' duplicate(s).' : 'No duplicates found.', removed > 0 ? 'ok' : 'warn');
+}
+
+
 function removeCard(card) {
   const ta = document.getElementById('lista');
   // match by the card number (first segment before |) to handle yy/yyyy variants
@@ -532,6 +568,7 @@ function removeCard(card) {
   // update filled state
   const grp = document.getElementById('cardGroup');
   if (grp) grp.classList.toggle('filled', ta.value.trim() !== '');
+  updateCardCount();
   saveSession();
 }
 
@@ -574,10 +611,15 @@ async function startScan() {
   const threads = parseInt(document.getElementById('threadSlider').value) || 5;
 
   if (!cards)   { toast('Paste cards first.', 'warn'); return; }
-  if (!domains) { toast('Paste at least one domain.', 'warn'); return; }
+  // Empty domains is allowed — backend falls back to saved authnet.txt / ppcp.txt
+
+  // Spinner on START button
+  const btnStart = document.getElementById('btnStart');
+  btnStart.disabled = true;
+  btnStart.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Starting…';
 
   // Reset UI
-  _liveLines = []; _deadLines = []; _errLines = [];
+  _liveLines = []; _deadLines = []; _errLines = []; _liveOpened = false;
   document.querySelector('.aprovadas').innerHTML = '';
   document.querySelector('.reprovadas').innerHTML = '';
   document.querySelector('.none').innerHTML = '';
@@ -598,12 +640,16 @@ async function startScan() {
     });
     data = await res.json();
   } catch(e) {
+    btnStart.disabled = false;
+    btnStart.innerHTML = 'START';
     toast('Network error: ' + e.message, 'err');
     setStatus('Error', 'badge-danger');
     return;
   }
 
   if (!res.ok || data.error) {
+    btnStart.disabled = false;
+    btnStart.innerHTML = 'START';
     toast(data.error || 'Server error', 'err');
     setStatus('Error', 'badge-danger');
     return;
@@ -611,6 +657,8 @@ async function startScan() {
 
   _jobId   = data.job_id;
   _running = true;
+  btnStart.disabled = false;
+  btnStart.innerHTML = 'START';
   const total = data.total;
   setText('cTotal', total);
   setStatus('Running…', 'badge-info');
@@ -648,6 +696,18 @@ async function startScan() {
           const copyBin = msg.bin_info ? ' [' + msg.bin_info + ']' : '';
           _liveLines.push(msg.card + (msg.amount ? ' =>> ' + msg.amount : '') + copyBin + ' | ' + (msg.domain||''));
           appendLine('aprovadas', 'line-live', line);
+          // Auto-open live panel on first hit
+          if (!_liveOpened) {
+            _liveOpened = true;
+            const panel = document.getElementById('bode');
+            const btn   = document.getElementById('mostra');
+            if (panel && panel.style.display === 'none') {
+              panel.style.display = 'block';
+              const icon = btn && btn.querySelector('i');
+              if (icon) { icon.classList.remove('fa-eye'); icon.classList.add('fa-eye-slash'); }
+              if (btn) btn.setAttribute('aria-expanded', 'true');
+            }
+          }
         } else if (msg.status === 'dead') {
           const line = card + ' ❌ ' + message + amount + domain;
           _deadLines.push(msg.card);
@@ -667,6 +727,8 @@ async function startScan() {
       _evtSrc.close();
       setProgress(msg.total, msg.total);
       setStatus('Completed', 'badge-success');
+      document.getElementById('btnStart').disabled = false;
+      document.getElementById('btnStart').innerHTML = 'START';
       toast('Done — Live: ' + msg.live + '  Dead: ' + msg.dead + '  Error: ' + msg.unknown, 'ok');
     }
   };
@@ -675,6 +737,8 @@ async function startScan() {
     if (!_running) return;
     _running = false;
     _evtSrc.close();
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnStart').innerHTML = 'START';
     setStatus('Stream error', 'badge-danger');
     toast('SSE connection lost.', 'err');
   };
@@ -686,6 +750,8 @@ async function stopScan() {
   try { await fetch('/stop/' + _jobId, { method: 'POST' }); } catch {}
   _running = false;
   if (_evtSrc) { _evtSrc.close(); _evtSrc = null; }
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStart').innerHTML = 'START';
   setStatus('Stopped', 'badge-warning');
   toast('Stopped.', 'warn');
 }
