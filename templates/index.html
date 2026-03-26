@@ -779,6 +779,13 @@ async function copyCards(type) {
   } catch(e) { toast('Copy failed: ' + e.message, 'err'); }
 }
 
+// ─── Auto-stop on page unload (reload / navigate away) ──────────────────────
+window.addEventListener('beforeunload', () => {
+  if (_running && _jobId) {
+    navigator.sendBeacon('/stop/' + _jobId);
+  }
+});
+
 // ─── Keyboard shortcut ───────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); startScan(); }
