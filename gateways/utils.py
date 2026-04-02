@@ -47,6 +47,13 @@ PROXIES: dict = {
     },
 }
 
+# Rayobyte country codes supported for geo-targeted residential proxies.
+# Any country NOT in this set falls back to US.
+_RAYOBYTE_COUNTRIES = {
+    "US", "GB", "AU", "CA", "NZ", "SG", "MY", "PH",
+    "NL", "ZA", "HK", "TH", "JP", "DE", "FR", "IT", "ES", "IE",
+}
+
 
 def get_proxy(name: str = None) -> dict:
     if name and name != "rotate":
@@ -70,6 +77,26 @@ def build_session(proxy: str = None) -> requests.Session:
     s = requests.Session()
     s.headers.clear()
     s.proxies.update(get_proxy(proxy))
+    s.verify = False
+    return s
+
+
+def build_session_for_domain(domain: str) -> requests.Session:
+    """Session with a Rayobyte proxy geo-targeted to the domain's country.
+
+    Uses the country derived from the TLD (e.g. .co.uk → GB) to build:
+      micojohncherry_gmail_com:micolovekatelyn-country-{CC}@la.residential.rayobyte.com:8000
+    Falls back to US if the country is not in _RAYOBYTE_COUNTRIES.
+    """
+    country = get_country_for_domain(domain)
+    if country not in _RAYOBYTE_COUNTRIES:
+        country = "US"
+    host = PROXIES["rayobyte"]["host"]
+    base_auth = PROXIES["rayobyte"]["auth"]   # micojohncherry_gmail_com:micolovekatelyn
+    url = f"http://{base_auth}-country-{country}@{host}"
+    s = requests.Session()
+    s.headers.clear()
+    s.proxies.update({"http": url, "https": url})
     s.verify = False
     return s
 

@@ -22,6 +22,7 @@ from gateways.ppcp       import check_ppcp
 from gateways.pymntpl    import check_pymntpl
 from gateways.utils      import (
     build_session,
+    build_session_for_domain,
     build_session_from_str,
     fetch_bin_dict,
     fetch_bin_info,
@@ -173,11 +174,11 @@ def _scan_worker(
             if job.get("stop"):
                 semaphore.release()
                 return
-            # Use user-supplied proxy if provided, otherwise fall back to proxyverse
+            # Use user-supplied proxy if provided, otherwise use Rayobyte geo-targeted to domain country
             if user_proxy:
                 sess = build_session_from_str(user_proxy)
             else:
-                sess = build_session("proxyverse")
+                sess = build_session_for_domain(domain)
             try:
                 if gateway == "ppcp":
                     result = check_ppcp(sess, domain, card_tuple)
