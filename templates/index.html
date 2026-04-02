@@ -101,27 +101,63 @@
     }
     select.form-control option { background: #1e1e1e; color: #e0e0e0; }
 
-    /* Floating label */
-    .floating-label-group { position: relative; margin-top: 1.2rem; width: 100%; text-align: center; }
+    /* ── Floating label (centered — card input) ─────────────────────────── */
+    .floating-label-group { position: relative; margin-top: 1.5rem; width: 100%; text-align: center; }
     .floating-label-group textarea { padding-top: 1.5rem; text-align: center; }
     .floating-label-group label {
-      position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-      font-size: 16px; color: #999; pointer-events: none;
-      transition: all .2s ease; padding: 0 5px; white-space: nowrap;
+      position: absolute; top: .85rem; left: 50%; transform: translateX(-50%);
+      font-size: .9rem; font-weight: 400;
+      color: rgba(255,255,255,.28);
+      pointer-events: none;
+      white-space: nowrap;
+      letter-spacing: .03em;
+      padding: 0 .4rem;
+      transition:
+        top            .22s cubic-bezier(.4,0,.2,1),
+        font-size      .22s cubic-bezier(.4,0,.2,1),
+        font-weight    .22s cubic-bezier(.4,0,.2,1),
+        color          .22s cubic-bezier(.4,0,.2,1),
+        letter-spacing .22s cubic-bezier(.4,0,.2,1),
+        transform      .22s cubic-bezier(.4,0,.2,1);
+      background: transparent;
     }
     .floating-label-group.focused label,
-    .floating-label-group.filled label { top: -8px; font-size: 12px; color: #ccc; }
+    .floating-label-group.filled label {
+      top: 0; transform: translate(-50%, -50%);
+      font-size: .68rem; font-weight: 600;
+      letter-spacing: .08em; text-transform: uppercase;
+      background: linear-gradient(to bottom, rgba(24,24,24,.98) 55%, transparent 55%);
+    }
+    .floating-label-group.filled label  { color: rgba(255,255,255,.45); }
+    .floating-label-group.focused label { color: #5ba3ff; }
 
-    /* Domain label group (left-aligned) */
-    .domain-label-group { position: relative; margin-top: 1.2rem; width: 100%; }
+    /* ── Domain label (left-aligned) ────────────────────────────────────── */
+    .domain-label-group { position: relative; margin-top: 1.5rem; width: 100%; }
     .domain-label-group textarea { padding-top: 1.5rem; }
     .domain-label-group label {
-      position: absolute; top: 14px; left: .75rem;
-      font-size: 14px; color: #999; pointer-events: none;
-      transition: all .2s ease;
+      position: absolute; top: .85rem; left: .8rem;
+      font-size: .9rem; font-weight: 400;
+      color: rgba(255,255,255,.28);
+      pointer-events: none;
+      letter-spacing: .03em;
+      padding: 0 .3rem;
+      transition:
+        top            .22s cubic-bezier(.4,0,.2,1),
+        font-size      .22s cubic-bezier(.4,0,.2,1),
+        font-weight    .22s cubic-bezier(.4,0,.2,1),
+        color          .22s cubic-bezier(.4,0,.2,1),
+        letter-spacing .22s cubic-bezier(.4,0,.2,1);
+      background: transparent;
     }
     .domain-label-group.focused label,
-    .domain-label-group.filled label { top: -8px; font-size: 12px; color: #ccc; }
+    .domain-label-group.filled label {
+      top: 0; transform: translateY(-50%);
+      font-size: .68rem; font-weight: 600;
+      letter-spacing: .08em; text-transform: uppercase;
+      background: linear-gradient(to bottom, rgba(24,24,24,.98) 55%, transparent 55%);
+    }
+    .domain-label-group.filled label  { color: rgba(255,255,255,.45); }
+    .domain-label-group.focused label { color: #5ba3ff; }
 
     /* Thread slider */
     .slider-row { display: flex; align-items: center; gap: .75rem; margin-top: .5rem; }
@@ -275,7 +311,7 @@
               <textarea id="domainInput" class="md-textarea form-control" rows="3"
                 autocomplete="off" spellcheck="false"
                 aria-label="Domain input field"></textarea>
-              <label for="domainInput">Domains (one per line) — leave blank to use saved sites</label>
+              <label for="domainInput">Domains (one per line)</label>
             </div>
           </div>
 
@@ -439,10 +475,10 @@ let _badDomains  = [];
 
 // ─── Gateway selector ───────────────────────────────────────────────────────────
 const _GW_DOMAIN_HINTS = {
-  authnet:   'AuthNet stores (one per line) — leave blank to use saved sites',
-  ppcp:      'PPCP / PayPal stores (one per line) — leave blank to use saved sites',
-  pymntpl:   'PaymentPlugins PayPal stores (one per line) — leave blank to use saved sites',
-  b3magento: 'Braintree Magento 2 stores (one per line) — leave blank to use saved sites',
+  authnet:   'AuthNet stores (one per line)',
+  ppcp:      'PPCP / PayPal stores (one per line)',
+  pymntpl:   'PaymentPlugins PayPal stores (one per line)',
+  b3magento: 'Braintree Magento 2 stores (one per line)',
 };
 function setGateway(gw) {
   _gateway = gw;
