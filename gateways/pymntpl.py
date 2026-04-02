@@ -301,6 +301,8 @@ def check_pymntpl(session: requests.Session, domain: str, card_tuple: tuple, **k
         "card_declined", "unauthorized_card", "do_not_honor", "restricted_card",
         "card_type_not_supported", "account_closed", "invalid_account",
         "card_stolen", "card_lost", "currency_not_supported_for_card_type",
+        "payer_cannot_pay", "payer_action_required", "payer_account_restricted",
+        "payer_account_locked_or_closed", "transaction_refused",
     }
 
     try:
