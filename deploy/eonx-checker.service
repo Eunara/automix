@@ -9,9 +9,9 @@ Group=www-data
 WorkingDirectory=/var/www/automix.eonx.ph
 ExecStart=/home/administrator/.local/bin/gunicorn app:app \
     --bind 127.0.0.1:5052 \
-    --workers 6 \
+    --workers 14 \
     --worker-class gthread \
-    --threads 2 \
+    --threads 4 \
     --timeout 180 \
     --keep-alive 5 \
     --access-logfile - \
@@ -21,6 +21,10 @@ Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
+# ── Resource caps: 90% of 8 vCores / 16 GB RAM ──────────────────────────────
+CPUQuota=720%
+MemoryMax=14G
+MemorySwapMax=0
 
 [Install]
 WantedBy=multi-user.target

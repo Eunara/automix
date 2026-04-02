@@ -61,7 +61,7 @@ app = Flask(__name__)
 DEFAULT_THREADS    = 3
 MAX_THREADS        = 5
 JOB_TTL            = 1800   # seconds before completed jobs are reaped
-MAX_CONCURRENT_JOBS = 10   # 10 users max — 10 × 5 threads = 50 concurrent requests
+MAX_CONCURRENT_JOBS = 30   # 30 users max — 30 × 5 threads = 150 concurrent requests
 
 # ── In-memory job store ───────────────────────────────────────────────────────
 JOBS: dict[str, dict] = {}
