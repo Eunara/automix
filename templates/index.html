@@ -236,12 +236,13 @@
     /* ----- Panel icon buttons (copy + eye) — fixed square, all screens ----- */
     .panel-btn-group { display:flex; align-items:center; gap:.4rem; }
     .panel-btn-group .btn {
-      width:2rem; height:2rem;
-      padding:0;
-      display:inline-flex; align-items:center; justify-content:center;
-      min-width:unset !important;
-      flex-shrink:0;
+      width:2rem !important; min-width:2rem !important; max-width:2rem !important;
+      height:2rem !important;
+      padding:0 !important;
+      display:inline-flex !important; align-items:center; justify-content:center;
+      flex-shrink:0; flex-grow:0;
       font-size:.82rem;
+      box-sizing:border-box;
     }
 
     /* ----- Result panels ----- */
