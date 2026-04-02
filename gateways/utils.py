@@ -16,7 +16,7 @@ import urllib3
 
 urllib3.disable_warnings()
 
-REQUEST_TIMEOUT = 30
+REQUEST_TIMEOUT = 22
 
 # ── Browser User-Agents ───────────────────────────────────────────────────────
 
