@@ -58,6 +58,18 @@ _DEAD_KEYWORDS = [
     "restricted card",
     "transaction not allowed",
     "card not supported",
+    # Additional PayPal / WC decline reasons
+    "lost or stolen",
+    "card reported lost",
+    "cvv2 failure",
+    "cvv2",
+    "restricted or inactive",
+    "account closed",
+    "invalid account",
+    "account suspended",
+    "card is not activated",
+    "not permitted",
+    "do not honour",
 ]
 
 

@@ -327,6 +327,15 @@ def check_authnet(
         "payment could not be processed",
         "order could not be placed",
         "please try again or try an alternate",
+        "lost or stolen",
+        "card reported lost",
+        "cvv2 failure",
+        "restricted or inactive",
+        "account closed",
+        "invalid account",
+        "account suspended",
+        "not permitted",
+        "do not honour",
     ]
     for s in DEAD_MSGS:
         if s in message.lower():

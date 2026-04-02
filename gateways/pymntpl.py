@@ -65,6 +65,24 @@ _DEAD_KEYWORDS = [
     "payment provider declined",
     "we were unable to process your order",
     "unable to process your payment",
+    # Additional PayPal / WC decline reasons
+    "lost or stolen",
+    "card reported lost",
+    "cvv2 failure",
+    "cvv2",
+    "restricted or inactive",
+    "account closed",
+    "invalid account",
+    "account suspended",
+    "card is not activated",
+    "not permitted",
+    "do not honour",
+    "expired card",
+    "card has expired",
+    "security code",
+    "restricted card",
+    "transaction not allowed",
+    "card not supported",
 ]
 
 
