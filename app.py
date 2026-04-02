@@ -500,6 +500,16 @@ def stop_job(job_id: str):
     return jsonify({"ok": True})
 
 
+@app.route("/sites/<gateway>")
+def get_sites(gateway: str):
+    """Return saved working sites for a gateway as a JSON list."""
+    if gateway not in _WORKING_SITES:
+        return jsonify([])
+    with _SITES_LOCK:
+        sites = sorted(_WORKING_SITES.get(gateway, set()))
+    return jsonify(sites)
+
+
 @app.route("/stream/<job_id>")
 def stream(job_id: str):
     job = JOBS.get(job_id)
