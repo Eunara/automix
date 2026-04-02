@@ -86,6 +86,42 @@ _DEAD_KEYWORDS = [
 ]
 
 
+# ── PayPal issue-code → readable label ───────────────────────────────────────
+_PP_ISSUE_LABELS = {
+    "card_expired":                          "Card Expired",
+    "invalid_cvv":                           "Invalid CVV",
+    "cvv_failure":                           "CVV Failure",
+    "instrument_declined":                   "Card Declined",
+    "card_declined":                         "Card Declined",
+    "unauthorized_card":                     "Unauthorized Card",
+    "do_not_honor":                          "Do Not Honor",
+    "restricted_card":                       "Restricted Card",
+    "card_type_not_supported":               "Card Type Not Supported",
+    "account_closed":                        "Account Closed",
+    "invalid_account":                       "Invalid Account",
+    "card_stolen":                           "Card Reported Stolen",
+    "card_lost":                             "Card Reported Lost",
+    "currency_not_supported_for_card_type":  "Currency Not Supported",
+    "payer_cannot_pay":                      "Payer Cannot Pay",
+    "payer_action_required":                 "3DS Required",
+    "payer_account_restricted":              "Account Restricted",
+    "payer_account_locked_or_closed":        "Account Locked / Closed",
+    "transaction_refused":                   "Transaction Refused",
+    "security_violation":                    "Security Violation",
+    "insufficient_funds":                    "Insufficient Funds",
+    "avs_failure":                           "AVS Failure",
+    "avs":                                   "AVS Failure",
+}
+
+
+def _extract_reason(text: str) -> str:
+    """Pull the 'Reason: X' clause from a WooCommerce error message."""
+    m = re.search(r'[Rr]eason\s*:\s*([^.<\n]{3,80})', text)
+    if m:
+        return m.group(1).strip().rstrip(".").strip()
+    return ""
+
+
 def _classify(payment_text: str, amount: str, card_str: str) -> dict:
     if '"result":"success"' in payment_text and "order-received" in payment_text:
         return {"status": "live", "message": "Charged", "amount": amount, "card": card_str}
@@ -110,8 +146,19 @@ def _classify(payment_text: str, amount: str, card_str: str) -> dict:
     msg_clean = re.sub(r"<[^>]+>", " ", str(raw_msg))
     msg_clean = re.sub(r"\s+", " ", msg_clean).strip()
 
-    paypal_code = re.search(r"#([A-Z_]{3,})", payment_text)
-    short_msg   = paypal_code.group(1) if paypal_code else (msg_clean[:120] or "Unknown")
+    # Priority 1: extract "Reason: X" clause → cleanest label
+    short_msg = _extract_reason(msg_clean) or _extract_reason(payment_text)
+
+    # Priority 2: PayPal #ISSUE_CODE in the raw text
+    if not short_msg:
+        m = re.search(r"#([A-Z_]{3,})", payment_text)
+        if m:
+            code = m.group(1).lower()
+            short_msg = _PP_ISSUE_LABELS.get(code, m.group(1).replace("_", " ").title())
+
+    # Priority 3: first 100 chars of cleaned message
+    if not short_msg:
+        short_msg = msg_clean[:100] or "Unknown"
 
     combined = (msg_clean + " " + payment_text).lower()
     for kw in _DEAD_KEYWORDS:
@@ -344,7 +391,7 @@ def check_pymntpl(session: requests.Session, domain: str, card_tuple: tuple, **k
                 issue, name = "", confirm_r.text[:80].lower()
 
             combined_err = f"{issue} {name}".strip()
-            label = (issue or name or "declined").replace("_", " ").title()[:80]
+            label = _PP_ISSUE_LABELS.get(issue, (issue or name or "declined").replace("_", " ").title())[:80]
             is_dead = any(k in combined_err for k in _PP_DEAD_ISSUES)
             return {
                 "status":  "dead" if is_dead else "unknown",
