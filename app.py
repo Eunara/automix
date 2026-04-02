@@ -17,9 +17,9 @@ urllib3.disable_warnings()
 
 from flask import Flask, Response, jsonify, render_template, request
 
-from checker import check_authnet
-from ppcp    import check_ppcp
-from utils   import (
+from gateways.authnetcim import check_authnet
+from gateways.ppcp       import check_ppcp
+from gateways.utils      import (
     build_session,
     build_session_from_str,
     fetch_bin_dict,
@@ -77,8 +77,8 @@ _TOKEN_LOCK = threading.Lock()
 # Domains that produced a definitive result (live or dead, NOT unknown) are
 # saved per gateway and used as the default list when the domain field is empty.
 WORKING_SITES_FILES = {
-    "authnet": "authnet.txt",
-    "ppcp":    "ppcp.txt",
+    "authnet": "data/authnet.txt",
+    "ppcp":    "data/ppcp.txt",
 }
 _WORKING_SITES: dict[str, set] = {"authnet": set(), "ppcp": set()}
 _SITES_LOCK = threading.Lock()

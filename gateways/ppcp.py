@@ -15,7 +15,7 @@ from urllib.parse import urlencode
 
 import requests
 
-from utils import (
+from .utils import (
     REQUEST_TIMEOUT,
     convert_year,
     discover_product_id,

@@ -33,6 +33,15 @@ PREREQUISITES
   # git -C /var/www/automix.eonx.ph pull
   chown -R administrator:www-data /var/www/automix.eonx.ph
 
+  Directory layout after clone:
+    app.py             ← gunicorn entry point
+    gateways/          ← authnetcim.py, ppcp.py, utils.py
+    data/              ← authnet.txt, ppcp.txt, cards/ (created in step 5)
+    deploy/            ← eonx-checker.service, automix.DOMAIN.nginx
+    static/            ← assets
+    templates/         ← HTML templates
+    TRANSFER.txt       ← this file
+
 
 4. PYTHON DEPENDENCIES
 ----------------------
@@ -42,22 +51,22 @@ PREREQUISITES
 5. DATA FILES  (NOT in git — must be created manually)
 ------------------------------------------------------
   # Approved cards log
-  mkdir -p /var/www/automix.eonx.ph/cards
-  touch /var/www/automix.eonx.ph/cards/approved.txt
+  mkdir -p /var/www/automix.eonx.ph/data/cards
+  touch /var/www/automix.eonx.ph/data/cards/approved.txt
 
   # Working site lists (one domain per line)
-  touch /var/www/automix.eonx.ph/authnet.txt   # Authorize.Net stores
-  touch /var/www/automix.eonx.ph/ppcp.txt       # PayPal PPCP stores
+  touch /var/www/automix.eonx.ph/data/authnet.txt   # Authorize.Net stores
+  touch /var/www/automix.eonx.ph/data/ppcp.txt       # PayPal PPCP stores
 
   # If transferring from an existing server, copy these 3 files over:
-  # scp old-vps:/var/www/automix.eonx.ph/cards/approved.txt  /var/www/automix.eonx.ph/cards/
-  # scp old-vps:/var/www/automix.eonx.ph/authnet.txt          /var/www/automix.eonx.ph/
-  # scp old-vps:/var/www/automix.eonx.ph/ppcp.txt             /var/www/automix.eonx.ph/
+  # scp old-vps:/var/www/automix.eonx.ph/data/cards/approved.txt  /var/www/automix.eonx.ph/data/cards/
+  # scp old-vps:/var/www/automix.eonx.ph/data/authnet.txt          /var/www/automix.eonx.ph/data/
+  # scp old-vps:/var/www/automix.eonx.ph/data/ppcp.txt             /var/www/automix.eonx.ph/data/
 
 
 6. SYSTEMD SERVICE
 ------------------
-  cp /var/www/automix.eonx.ph/eonx-checker.service /etc/systemd/system/eonx-checker.service
+  cp /var/www/automix.eonx.ph/deploy/eonx-checker.service /etc/systemd/system/eonx-checker.service
 
   # If deploying on a different path, edit WorkingDirectory inside:
   # nano /etc/systemd/system/eonx-checker.service
@@ -72,7 +81,7 @@ PREREQUISITES
 ---------------------
   # Copy and rename the template — replace "yourdomain.com" with your actual domain
   DOMAIN="yourdomain.com"
-  cp /var/www/automix.eonx.ph/automix.DOMAIN.nginx \
+  cp /var/www/automix.eonx.ph/deploy/automix.DOMAIN.nginx \
      /etc/nginx/sites-available/automix.${DOMAIN}
 
   # Replace the placeholder inside the file
@@ -137,9 +146,9 @@ PREREQUISITES
 ====================================================
   IMPORTANT FILES NOT TRACKED IN GIT
 ====================================================
-  cards/approved.txt   — approved card hits log
-  authnet.txt          — working Authorize.Net store list
-  ppcp.txt             — working PayPal PPCP store list
+  data/cards/approved.txt   — approved card hits log
+  data/authnet.txt          — working Authorize.Net store list
+  data/ppcp.txt             — working PayPal PPCP store list
 
   Back these up before decommissioning a server!
 ====================================================

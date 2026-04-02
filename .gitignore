@@ -1,8 +1,7 @@
 # Sensitive / generated — never commit
-cards/
-cookies/
-authnet.txt
-ppcp.txt
+data/cards/
+data/authnet.txt
+data/ppcp.txt
 
 # Python cache
 __pycache__/

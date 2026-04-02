@@ -1,7 +1,7 @@
 """
-checker.py — Authorize.Net CIM gateway module.
+authnetcim.py — Authorize.Net CIM gateway module.
 Pluggable: returns structured dicts, no file I/O, no prints.
-All shared helpers live in utils.py.
+All shared helpers live in gateways/utils.py.
 """
 
 import json
@@ -12,7 +12,7 @@ import urllib3
 
 urllib3.disable_warnings()
 
-from utils import (
+from .utils import (
     REQUEST_TIMEOUT,
     build_plain_session,
     convert_year,
