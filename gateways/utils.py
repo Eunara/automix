@@ -549,4 +549,21 @@ def discover_product_id(session: requests.Session, domain: str) -> str:
         except Exception:
             continue
 
+    # ── Fallback: WooCommerce Store REST API (public, no auth required) ───────────
+    # Works for stores where all HTML pages have no add-to-cart buttons
+    try:
+        r = session.get(
+            f"https://{domain}/wp-json/wc/store/v1/products?per_page=1",
+            headers={"User-Agent": ua},
+            timeout=REQUEST_TIMEOUT,
+        )
+        data = r.json()
+        if isinstance(data, list) and data:
+            pid = str(data[0].get("id", ""))
+            if pid:
+                _cache_put(domain, pid)
+                return pid
+    except Exception:
+        pass
+
     return ""

