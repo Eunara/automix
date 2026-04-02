@@ -214,7 +214,8 @@
     .gw-pill.active-ppcp      { background:rgba(0,150,220,.25);  border-color:rgba(0,150,220,.5);  color:#fff; box-shadow:0 0 8px rgba(0,150,220,.35); }
     .gw-pill.active-pymntpl   { background:rgba(103,58,183,.25); border-color:rgba(103,58,183,.5); color:#fff; box-shadow:0 0 8px rgba(103,58,183,.35); }
     .gw-pill.active-b3magento { background:rgba(230,81,0,.25);   border-color:rgba(230,81,0,.5);   color:#fff; box-shadow:0 0 8px rgba(230,81,0,.35); }
-    .gw-pill:not(.active-authnet):not(.active-ppcp):not(.active-pymntpl):not(.active-b3magento):hover { background:rgba(255,255,255,.1); color:#ddd; }
+    .gw-pill.active-b3woo      { background:rgba(127,84,179,.25); border-color:rgba(127,84,179,.5); color:#fff; box-shadow:0 0 8px rgba(127,84,179,.35); }
+    .gw-pill:not(.active-authnet):not(.active-ppcp):not(.active-pymntpl):not(.active-b3magento):not(.active-b3woo):hover { background:rgba(255,255,255,.1); color:#ddd; }
 
     /* ----- Result panels ----- */
     .result-body { display:none; word-break:break-all; font-size:.82rem; line-height:1.9; }
@@ -251,12 +252,25 @@
     ::-webkit-scrollbar-thumb { background:#555; border-radius:10px; border:2px solid #1e1e1e; }
     ::-webkit-scrollbar-thumb:hover { background:#888; }
 
+    /* ----- Gateway pills — always wrappable ----- */
+    .gw-pills { flex-wrap: wrap; }
+
     /* ----- Mobile ----- */
     @media (max-width:768px) {
       .btn.btn-primary, .btn.btn-danger { min-width:unset; width:100%; margin-top:.5rem; }
       .d-flex.justify-content-around { flex-direction:column; }
       .card-header:not(.h5) { flex-wrap:wrap; gap:.5rem; }
+      .card-header.h5 { flex-wrap:wrap; gap:.5rem; }
       .sticky-stats { position:static; }
+      .gw-pill { font-size:.7rem; padding:.18rem .6rem; }
+      .card-body { padding:.85rem; }
+      .slider-row { gap:.4rem; }
+    }
+    @media (max-width:480px) {
+      .card-header.h5 > span:first-child { font-size:1rem; }
+      .gw-pills { gap:.35rem; }
+      .gw-pill { font-size:.68rem; padding:.15rem .55rem; }
+      .floating-label-group, .domain-label-group { margin-top:1.1rem; }
     }
     @media (prefers-reduced-motion:reduce) {
       *, *::before, *::after { animation-duration:.01ms!important; transition-duration:.01ms!important; }
@@ -279,6 +293,7 @@
             <span class="gw-pill" id="pillPpcp"       onclick="setGateway('ppcp')">PPCP</span>
             <span class="gw-pill" id="pillPymntpl"    onclick="setGateway('pymntpl')">PYMNTPL</span>
             <span class="gw-pill" id="pillB3magento"  onclick="setGateway('b3magento')">B3 MAGENTO</span>
+            <span class="gw-pill" id="pillB3woo"      onclick="setGateway('b3woo')">B3 WOO</span>
           </div>
         </div>
         <div class="card-body">
@@ -478,11 +493,12 @@ const _GW_DOMAIN_HINTS = {
   authnet:   'AuthNet — enter target store URLs',
   ppcp:      'PayPal / PPCP — enter target store URLs',
   pymntpl:   'PaymentPlugins — enter target store URLs',
-  b3magento: 'Magento 2 / Braintree — enter target store URLs',
+  b3magento: 'Braintree Magento 2 — enter target store URLs',
+  b3woo:     'Braintree WooCommerce — enter target store URLs',
 };
 function setGateway(gw) {
   _gateway = gw;
-  ['authnet','ppcp','pymntpl','b3magento'].forEach(g => {
+  ['authnet','ppcp','pymntpl','b3magento','b3woo'].forEach(g => {
     const id   = 'pill' + g.replace(/(?:^|-)([a-z])/g, (_, c) => c.toUpperCase());
     const pill = document.getElementById(id);
     if (pill) pill.className = 'gw-pill' + (g === gw ? ' active-' + g : '');
@@ -567,7 +583,7 @@ function loadSession() {
       document.getElementById('threadVal').textContent = t;
     }
     if (p) document.getElementById('proxyInput').value = p;
-    if (gw && ['authnet','ppcp','pymntpl','b3magento'].includes(gw)) setGateway(gw);
+    if (gw && ['authnet','ppcp','pymntpl','b3magento','b3woo'].includes(gw)) setGateway(gw);
     ['cardGroup','domainGroup'].forEach(id => {
       const grp = document.getElementById(id);
       const inp = grp && grp.querySelector('textarea');

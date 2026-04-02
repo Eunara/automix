@@ -19,6 +19,7 @@ from flask import Flask, Response, jsonify, render_template, request
 
 from gateways.authnetcim import check_authnet
 from gateways.b3magento  import check_b3magento
+from gateways.b3woo      import check_b3woo
 from gateways.ppcp       import check_ppcp
 from gateways.pymntpl    import check_pymntpl
 from gateways.utils      import (
@@ -84,8 +85,9 @@ WORKING_SITES_FILES = {
     "ppcp":      "data/ppcp.txt",
     "pymntpl":   "data/pymntpl.txt",
     "b3magento": "data/b3magento.txt",
+    "b3woo":     "data/b3woo.txt",
 }
-_WORKING_SITES: dict[str, set] = {"authnet": set(), "ppcp": set(), "pymntpl": set(), "b3magento": set()}
+_WORKING_SITES: dict[str, set] = {"authnet": set(), "ppcp": set(), "pymntpl": set(), "b3magento": set(), "b3woo": set()}
 _SITES_LOCK = threading.Lock()
 
 
@@ -151,6 +153,7 @@ _BAD_SITE_PATTERNS = [
     "add to cart failed",           # store has no cart / incompatible
     "not a pymntpl-paypal store",   # wrong gateway
     "not a braintree store",        # Magento store without Braintree
+    "not a woocommerce braintree store",  # WooCommerce store without Braintree
     "bot/firewall",                 # cloudflare / ddos-guard / captcha
     "non-json response",            # not a WooCommerce store
     "cart empty",                   # persistent empty-cart (ATC broken at site level)
@@ -252,6 +255,8 @@ def _scan_worker(
                         result = check_pymntpl(sess, domain, card_tuple)
                     elif gateway == "b3magento":
                         result = check_b3magento(sess, domain, card_tuple)
+                    elif gateway == "b3woo":
+                        result = check_b3woo(sess, domain, card_tuple)
                     else:
                         result = check_authnet(
                             sess, domain, "",   # "" → auto-discover product_id
@@ -411,7 +416,7 @@ def scan():
 
     user_proxy = str(data.get("proxy",   "") or "").strip()
     gateway    = str(data.get("gateway", "authnet") or "authnet").strip().lower()
-    if gateway not in ("authnet", "ppcp", "pymntpl", "b3magento"):
+    if gateway not in ("authnet", "ppcp", "pymntpl", "b3magento", "b3woo"):
         gateway = "authnet"
 
     # Parse cards: cc|mm|yy[|cvv]
