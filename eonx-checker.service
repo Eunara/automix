@@ -1,12 +1,12 @@
 [Unit]
-Description=AuthNet Card Checker — port 5052
+Description=EONX CHECKER — port 5052
 After=network.target
 
 [Service]
 Type=simple
 User=administrator
 Group=www-data
-WorkingDirectory=/var/www/html/chkr
+WorkingDirectory=/var/www/automix.eonx.ph
 ExecStart=/home/administrator/.local/bin/gunicorn app:app \
     --bind 127.0.0.1:5052 \
     --workers 6 \

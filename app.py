@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AuthNet CIM Card Checker  —  port 5052
+EONX CHECKER  —  port 5052
 Web UI + SSE streaming.  Gunicorn: 6 workers, gthread class.
 """
 
@@ -126,7 +126,8 @@ def _reaper() -> None:
             and job.get("status") in ("done", "queued")
         ]
         for jid in stale:
-            JOBS.pop(jid, None)
+            with _JOB_LOCK:
+                JOBS.pop(jid, None)
 
 threading.Thread(target=_reaper, daemon=True).start()
 
@@ -345,6 +346,9 @@ def scan():
 
     if not cards:
         return jsonify({"error": "No valid cards. Format: cc|mm|yy|cvv"}), 400
+    MAX_CARDS = 500
+    if len(cards) > MAX_CARDS:
+        return jsonify({"error": f"Too many cards. Maximum is {MAX_CARDS} per scan."}), 400
     if not domains:
         # Fall back to saved working sites for the selected gateway
         with _SITES_LOCK:
@@ -355,8 +359,9 @@ def scan():
     # Per-session rate limit — one active scan per browser session token
     client_token = str(data.get("client_token", "") or "").strip()[:64]
     if not client_token:
-        # Fallback to IP if no token provided (old clients)
-        client_token = (request.headers.get("X-Forwarded-For") or request.remote_addr or "unknown").split(",")[0].strip()
+        # Fallback to direct remote address only — do NOT trust X-Forwarded-For
+        # as it can be spoofed by clients to bypass per-session rate limiting.
+        client_token = (request.remote_addr or "unknown").strip()
 
     with _TOKEN_LOCK:
         # Per-session: one scan at a time per user
@@ -400,11 +405,11 @@ def stop_job(job_id: str):
 
 @app.route("/stream/<job_id>")
 def stream(job_id: str):
-    if job_id not in JOBS:
+    job = JOBS.get(job_id)
+    if job is None:
         return jsonify({"error": "Job not found"}), 404
 
     def generate():
-        job = JOBS[job_id]
         while True:
             if job.get("stop") and job["status"] != "done":
                 job["status"] = "done"

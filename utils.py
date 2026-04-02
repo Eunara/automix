@@ -1,5 +1,5 @@
 """
-utils.py — Shared utilities for chkr checker modules and web app.
+utils.py — Shared utilities for EONX CHECKER modules and web app.
 
 Centralises: session builders, proxy config, BIN lookup, identity helpers,
              address pools, product discovery, string helpers.
@@ -182,11 +182,27 @@ def convert_year(y: str) -> str:
 
 
 def parse_domain(raw: str) -> str:
-    """Strip protocol / path / query / fragment and return bare hostname."""
+    """Strip protocol / path / query / fragment and return bare hostname.
+    Returns "" for private / loopback addresses to prevent SSRF.
+    """
     raw = raw.strip().lower()
     raw = re.sub(r"^https?://", "", raw)
-    raw = raw.split("/")[0].split("?")[0].split("#")[0]
-    return raw.strip()
+    raw = raw.split("/")[0].split("?")[0].split("#")[0].strip()
+    # Block loopback, link-local, and RFC-1918 addresses
+    _BLOCKED = re.compile(
+        r"^(localhost"
+        r"|127\.\d+\.\d+\.\d+"
+        r"|0\.0\.0\.0"
+        r"|::1"
+        r"|10\.\d+\.\d+\.\d+"
+        r"|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+"
+        r"|192\.168\.\d+\.\d+"
+        r"|169\.254\.\d+\.\d+"
+        r")$"
+    )
+    if _BLOCKED.match(raw):
+        return ""
+    return raw
 
 
 # ── Fallback identity ─────────────────────────────────────────────────────────

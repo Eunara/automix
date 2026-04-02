@@ -1,0 +1,145 @@
+====================================================
+  EONX CHECKER — VPS Transfer & Installation Guide
+  Subdomain: automix.<your-domain>
+  App port:  5052
+====================================================
+
+PREREQUISITES
+-------------
+- Ubuntu 22.04 / 24.04 (recommended)
+- Root or sudo access
+- DNS A record: automix.<your-domain>  →  new VPS IP
+
+
+1. SYSTEM PACKAGES
+------------------
+  apt update && apt upgrade -y
+  apt install -y python3 python3-pip python3-venv \
+      nginx certbot python3-certbot-nginx git
+
+
+2. CREATE APP USER & DIRECTORY
+------------------------------
+  useradd -m -s /bin/bash administrator
+  mkdir -p /var/www/automix.eonx.ph
+  chown administrator:www-data /var/www/automix.eonx.ph
+
+
+3. CLONE THE REPOSITORY
+-----------------------
+  cd /var/www
+  git clone https://github.com/Eunara/automix.git automix.eonx.ph
+  # If the folder already exists from a previous install:
+  # git -C /var/www/automix.eonx.ph pull
+  chown -R administrator:www-data /var/www/automix.eonx.ph
+
+
+4. PYTHON DEPENDENCIES
+----------------------
+  sudo -u administrator pip3 install --user flask gunicorn requests urllib3
+
+
+5. DATA FILES  (NOT in git — must be created manually)
+------------------------------------------------------
+  # Approved cards log
+  mkdir -p /var/www/automix.eonx.ph/cards
+  touch /var/www/automix.eonx.ph/cards/approved.txt
+
+  # Working site lists (one domain per line)
+  touch /var/www/automix.eonx.ph/authnet.txt   # Authorize.Net stores
+  touch /var/www/automix.eonx.ph/ppcp.txt       # PayPal PPCP stores
+
+  # If transferring from an existing server, copy these 3 files over:
+  # scp old-vps:/var/www/automix.eonx.ph/cards/approved.txt  /var/www/automix.eonx.ph/cards/
+  # scp old-vps:/var/www/automix.eonx.ph/authnet.txt          /var/www/automix.eonx.ph/
+  # scp old-vps:/var/www/automix.eonx.ph/ppcp.txt             /var/www/automix.eonx.ph/
+
+
+6. SYSTEMD SERVICE
+------------------
+  cp /var/www/automix.eonx.ph/eonx-checker.service /etc/systemd/system/eonx-checker.service
+
+  # If deploying on a different path, edit WorkingDirectory inside:
+  # nano /etc/systemd/system/eonx-checker.service
+
+  systemctl daemon-reload
+  systemctl enable eonx-checker
+  systemctl start eonx-checker
+  systemctl status eonx-checker --no-pager
+
+
+7. NGINX VIRTUAL HOST
+---------------------
+  # Copy and rename the template — replace "yourdomain.com" with your actual domain
+  DOMAIN="yourdomain.com"
+  cp /var/www/automix.eonx.ph/automix.DOMAIN.nginx \
+     /etc/nginx/sites-available/automix.${DOMAIN}
+
+  # Replace the placeholder inside the file
+  sed -i "s/automix.yourdomain.com/automix.${DOMAIN}/g" \
+     /etc/nginx/sites-available/automix.${DOMAIN}
+
+  ln -s /etc/nginx/sites-available/automix.${DOMAIN} \
+        /etc/nginx/sites-enabled/automix.${DOMAIN}
+
+  nginx -t && systemctl reload nginx
+
+
+8. SSL CERTIFICATE (Let's Encrypt)
+-----------------------------------
+  DOMAIN="yourdomain.com"
+  certbot --nginx -d automix.${DOMAIN} \
+      --non-interactive --agree-tos -m admin@${DOMAIN}
+
+  # Certbot auto-updates the nginx config with SSL directives.
+  # Auto-renewal is managed by the certbot systemd timer (on by default).
+  nginx -t && systemctl reload nginx
+
+
+9. FIREWALL
+-----------
+  ufw allow OpenSSH
+  ufw allow 'Nginx Full'
+  ufw --force enable
+  ufw status
+
+
+10. VERIFY
+----------
+  curl -sI https://automix.yourdomain.com | head -5    # HTTP 200
+  systemctl status eonx-checker --no-pager
+  journalctl -u eonx-checker -n 50                     # live logs
+
+
+====================================================
+  MAINTENANCE COMMANDS
+====================================================
+  Restart app:    systemctl restart eonx-checker
+  View logs:      journalctl -u eonx-checker -n 100
+  Pull updates:   cd /var/www/automix.eonx.ph && git pull && systemctl restart eonx-checker
+  Nginx reload:   systemctl reload nginx
+  Cert renew:     certbot renew --dry-run
+
+====================================================
+  SUBDOMAIN CONVENTION
+====================================================
+  This app is always deployed at:   automix.<your-domain>
+  Examples:
+    automix.eonx.ph
+    automix.example.com
+    automix.mysite.net
+
+  The nginx template (automix.DOMAIN.nginx) and service file
+  (eonx-checker.service) in this repo are ready to use.
+  Only the server_name line in the nginx config needs to change
+  per domain — everything else stays identical.
+
+====================================================
+  IMPORTANT FILES NOT TRACKED IN GIT
+====================================================
+  cards/approved.txt   — approved card hits log
+  authnet.txt          — working Authorize.Net store list
+  ppcp.txt             — working PayPal PPCP store list
+
+  Back these up before decommissioning a server!
+====================================================

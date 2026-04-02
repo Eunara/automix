@@ -1,7 +1,21 @@
-server {
-    server_name chkr.eonx.ph;
+##############################################################
+#  EONX CHECKER — Nginx template
+#  Subdomain convention: automix.<your-domain>
+#
+#  Usage:
+#    1. Replace every occurrence of "automix.yourdomain.com"
+#       below with your actual subdomain (e.g. automix.eonx.ph)
+#    2. Copy to /etc/nginx/sites-available/automix.yourdomain.com
+#    3. Symlink: ln -s /etc/nginx/sites-available/automix.yourdomain.com \
+#                       /etc/nginx/sites-enabled/automix.yourdomain.com
+#    4. Run: certbot --nginx -d automix.yourdomain.com
+#    5. nginx -t && systemctl reload nginx
+##############################################################
 
-    # SSE requires buffering off + long read timeout
+server {
+    server_name automix.yourdomain.com;
+
+    # SSE: buffering off + extended read timeout
     location /stream/ {
         proxy_pass http://127.0.0.1:5052;
         proxy_http_version 1.1;
@@ -31,4 +45,5 @@ server {
 
     listen 80;
     listen [::]:80;
+    # SSL directives will be added automatically by Certbot
 }
