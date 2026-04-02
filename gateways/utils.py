@@ -41,9 +41,9 @@ PROXIES: dict = {
         "host": "proxy.proxyverse.io:9200",
         "auth": "country-us:431583b3-a951-4697-a852-652946d45187",
     },
-    "scrapeless": {
-        "host": "gw-us.scrapeless.io:8789",
-        "auth": "5B1530171B49-proxy-country_US-r_1m-s_U90LanQB2r:trfnAxRM",
+    "rayobyte": {
+        "host": "la.residential.rayobyte.com:8000",
+        "auth": "micojohncherry_gmail_com:micolovekatelyn",
     },
 }
 
