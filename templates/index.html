@@ -706,12 +706,21 @@ async function startScan() {
         setText('cDead2',  msg.dead);
         setText('cError2', msg.unknown);
         setStatus('Running… ' + msg.done + '/' + msg.total, 'badge-info');
-        // Track bad domains (sites that errored and were skipped)
+        // Track bad domains — remove from GOOD SITES textarea, update counter
         if (msg.new_bad_domain && !_badDomains.includes(msg.new_bad_domain)) {
           _badDomains.push(msg.new_bad_domain);
           document.getElementById('badSitesBadge').textContent = _badDomains.length;
           const ind = document.getElementById('badSitesIndicator');
           if (ind) ind.style.display = 'flex';
+          // Remove bad domain from the textarea so it won't show as a good site
+          const ta = document.getElementById('domainInput');
+          if (ta) {
+            ta.value = ta.value.split('\n')
+              .filter(l => l.trim().toLowerCase() !== msg.new_bad_domain.toLowerCase())
+              .join('\n');
+            const grp = document.getElementById('domainGroup');
+            if (grp) grp.classList.toggle('filled', ta.value.trim() !== '');
+          }
         }
         if (msg.status === 'live') {
           const binInfo = msg.bin_info ? ' <span style="color:#b0bec5;font-size:.75em">[' + esc(msg.bin_info) + ']</span>' : '';
