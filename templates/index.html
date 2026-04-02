@@ -233,6 +233,17 @@
     #gwSelect.gw-b3magento { border-color:rgba(230,81,0,.5);   box-shadow:0 0 6px rgba(230,81,0,.25); }
     #gwSelect.gw-b3woo     { border-color:rgba(127,84,179,.5); box-shadow:0 0 6px rgba(127,84,179,.25); }
 
+    /* ----- Panel icon buttons (copy + eye) — fixed square, all screens ----- */
+    .panel-btn-group { display:flex; align-items:center; gap:.4rem; }
+    .panel-btn-group .btn {
+      width:2rem; height:2rem;
+      padding:0;
+      display:inline-flex; align-items:center; justify-content:center;
+      min-width:unset !important;
+      flex-shrink:0;
+      font-size:.82rem;
+    }
+
     /* ----- Result panels ----- */
     .result-body { display:none; word-break:break-all; font-size:.82rem; line-height:1.9; }
     .result-body .line-live    { color:#4caf50; }
@@ -278,6 +289,7 @@
       #gwSelect { font-size:.72rem; min-width:130px; }
       .card-body { padding:.85rem; }
       .slider-row { gap:.4rem; }
+      .btn.btn-primary.btn-sm, .btn.btn-danger.btn-sm { width:unset; margin-top:0; }
     }
     @media (max-width:480px) {
       .card-header.h5 > span:first-child { font-size:1rem; }
@@ -419,8 +431,8 @@
           <h6 class="card-title font-weight-bold my-0">
             LIVE &nbsp;<span id="cLive2" class="badge badge-success" aria-live="polite">0</span>
           </h6>
-          <div class="d-flex">
-            <button class="btn btn-outline-secondary btn-sm mr-2"
+          <div class="panel-btn-group">
+            <button class="btn btn-outline-secondary btn-sm"
               onclick="copyCards('live')" title="Copy live cards" aria-label="Copy live cards">
               <i class="fa-solid fa-copy"></i>
             </button>
@@ -443,8 +455,8 @@
           <h6 class="card-title font-weight-bold my-0">
             DEAD &nbsp;<span id="cDead2" class="badge badge-danger" aria-live="polite">0</span>
           </h6>
-          <div class="d-flex">
-            <button class="btn btn-outline-secondary btn-sm mr-2"
+          <div class="panel-btn-group">
+            <button class="btn btn-outline-secondary btn-sm"
               onclick="copyCards('dead')" title="Copy dead cards" aria-label="Copy dead cards">
               <i class="fa-solid fa-copy"></i>
             </button>
@@ -467,8 +479,8 @@
           <h6 class="card-title font-weight-bold my-0">
             ERROR &nbsp;<span id="cError2" class="badge badge-warning" aria-live="polite">0</span>
           </h6>
-          <div class="d-flex">
-            <button class="btn btn-outline-secondary btn-sm mr-2"
+          <div class="panel-btn-group">
+            <button class="btn btn-outline-secondary btn-sm"
               onclick="copyCards('error')" title="Copy error cards" aria-label="Copy error cards">
               <i class="fa-solid fa-copy"></i>
             </button>
