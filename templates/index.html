@@ -174,9 +174,10 @@
       background:rgba(255,255,255,.05); color:#aaa;
       transition:all .18s ease; user-select:none;
     }
-    .gw-pill.active-authnet { background:rgba(0,123,255,.25); border-color:rgba(0,123,255,.5); color:#fff; box-shadow:0 0 8px rgba(0,123,255,.35); }
-    .gw-pill.active-ppcp    { background:rgba(0,150,220,.25); border-color:rgba(0,150,220,.5); color:#fff; box-shadow:0 0 8px rgba(0,150,220,.35); }
-    .gw-pill:not(.active-authnet):not(.active-ppcp):hover { background:rgba(255,255,255,.1); color:#ddd; }
+    .gw-pill.active-authnet  { background:rgba(0,123,255,.25);  border-color:rgba(0,123,255,.5);  color:#fff; box-shadow:0 0 8px rgba(0,123,255,.35); }
+    .gw-pill.active-ppcp     { background:rgba(0,150,220,.25);  border-color:rgba(0,150,220,.5);  color:#fff; box-shadow:0 0 8px rgba(0,150,220,.35); }
+    .gw-pill.active-pymntpl  { background:rgba(103,58,183,.25); border-color:rgba(103,58,183,.5); color:#fff; box-shadow:0 0 8px rgba(103,58,183,.35); }
+    .gw-pill:not(.active-authnet):not(.active-ppcp):not(.active-pymntpl):hover { background:rgba(255,255,255,.1); color:#ddd; }
 
     /* ----- Result panels ----- */
     .result-body { display:none; word-break:break-all; font-size:.82rem; line-height:1.9; }
@@ -237,8 +238,9 @@
         <div class="card-header h5">
           <span>EONX CHECKER</span>
           <div class="gw-pills">
-            <span class="gw-pill active-authnet" id="pillAuthnet" onclick="setGateway('authnet')">AUTHNET</span>
-            <span class="gw-pill" id="pillPpcp" onclick="setGateway('ppcp')">PPCP</span>
+            <span class="gw-pill active-authnet" id="pillAuthnet"  onclick="setGateway('authnet')">AUTHNET</span>
+            <span class="gw-pill" id="pillPpcp"     onclick="setGateway('ppcp')">PPCP</span>
+            <span class="gw-pill" id="pillPymntpl"  onclick="setGateway('pymntpl')">PYMNTPL</span>
           </div>
         </div>
         <div class="card-body">
@@ -425,12 +427,13 @@ let _liveOpened = false;
 
 // ─── Gateway selector ───────────────────────────────────────────────────────────
 const _GW_DOMAIN_HINTS = {
-  authnet: 'AuthNet stores (one per line) — leave blank to use saved sites',
-  ppcp:    'PPCP / PayPal stores (one per line) — leave blank to use saved sites',
+  authnet:  'AuthNet stores (one per line) — leave blank to use saved sites',
+  ppcp:     'PPCP / PayPal stores (one per line) — leave blank to use saved sites',
+  pymntpl:  'PaymentPlugins PayPal stores (one per line) — leave blank to use saved sites',
 };
 function setGateway(gw) {
   _gateway = gw;
-  ['authnet','ppcp'].forEach(g => {
+  ['authnet','ppcp','pymntpl'].forEach(g => {
     const pill = document.getElementById('pill' + g.charAt(0).toUpperCase() + g.slice(1));
     if (pill) pill.className = 'gw-pill' + (g === gw ? ' active-' + g : '');
   });
@@ -514,7 +517,7 @@ function loadSession() {
       document.getElementById('threadVal').textContent = t;
     }
     if (p) document.getElementById('proxyInput').value = p;
-    if (gw && (gw === 'authnet' || gw === 'ppcp')) setGateway(gw);
+    if (gw && ['authnet','ppcp','pymntpl'].includes(gw)) setGateway(gw);
     ['cardGroup','domainGroup'].forEach(id => {
       const grp = document.getElementById(id);
       const inp = grp && grp.querySelector('textarea');

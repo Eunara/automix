@@ -19,6 +19,7 @@ from flask import Flask, Response, jsonify, render_template, request
 
 from gateways.authnetcim import check_authnet
 from gateways.ppcp       import check_ppcp
+from gateways.pymntpl    import check_pymntpl
 from gateways.utils      import (
     build_session,
     build_session_from_str,
@@ -77,10 +78,11 @@ _TOKEN_LOCK = threading.Lock()
 # Domains that produced a definitive result (live or dead, NOT unknown) are
 # saved per gateway and used as the default list when the domain field is empty.
 WORKING_SITES_FILES = {
-    "authnet": "data/authnet.txt",
-    "ppcp":    "data/ppcp.txt",
+    "authnet":  "data/authnet.txt",
+    "ppcp":     "data/ppcp.txt",
+    "pymntpl":  "data/pymntpl.txt",
 }
-_WORKING_SITES: dict[str, set] = {"authnet": set(), "ppcp": set()}
+_WORKING_SITES: dict[str, set] = {"authnet": set(), "ppcp": set(), "pymntpl": set()}
 _SITES_LOCK = threading.Lock()
 
 
@@ -179,6 +181,8 @@ def _scan_worker(
             try:
                 if gateway == "ppcp":
                     result = check_ppcp(sess, domain, card_tuple)
+                elif gateway == "pymntpl":
+                    result = check_pymntpl(sess, domain, card_tuple)
                 else:
                     result = check_authnet(
                         sess, domain, "",   # "" → auto-discover product_id
@@ -320,7 +324,7 @@ def scan():
 
     user_proxy = str(data.get("proxy",   "") or "").strip()
     gateway    = str(data.get("gateway", "authnet") or "authnet").strip().lower()
-    if gateway not in ("authnet", "ppcp"):
+    if gateway not in ("authnet", "ppcp", "pymntpl"):
         gateway = "authnet"
 
     # Parse cards: cc|mm|yy[|cvv]
