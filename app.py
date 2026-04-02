@@ -18,6 +18,7 @@ urllib3.disable_warnings()
 from flask import Flask, Response, jsonify, render_template, request
 
 from gateways.authnetcim import check_authnet
+from gateways.b3magento  import check_b3magento
 from gateways.ppcp       import check_ppcp
 from gateways.pymntpl    import check_pymntpl
 from gateways.utils      import (
@@ -79,11 +80,12 @@ _TOKEN_LOCK = threading.Lock()
 # Domains that produced a definitive result (live or dead, NOT unknown) are
 # saved per gateway and used as the default list when the domain field is empty.
 WORKING_SITES_FILES = {
-    "authnet":  "data/authnet.txt",
-    "ppcp":     "data/ppcp.txt",
-    "pymntpl":  "data/pymntpl.txt",
+    "authnet":   "data/authnet.txt",
+    "ppcp":      "data/ppcp.txt",
+    "pymntpl":   "data/pymntpl.txt",
+    "b3magento": "data/b3magento.txt",
 }
-_WORKING_SITES: dict[str, set] = {"authnet": set(), "ppcp": set(), "pymntpl": set()}
+_WORKING_SITES: dict[str, set] = {"authnet": set(), "ppcp": set(), "pymntpl": set(), "b3magento": set()}
 _SITES_LOCK = threading.Lock()
 
 
@@ -145,12 +147,13 @@ def _tg_live(text: str) -> None:
 # Proxy/network failures and transient WordPress errors keep the domain alive.
 
 _BAD_SITE_PATTERNS = [
-    "could not find product",   # no product on store
-    "add to cart failed",        # store has no cart / incompatible
-    "not a pymntpl-paypal store", # wrong gateway
-    "bot/firewall",              # cloudflare / ddos-guard / captcha
-    "non-json response",         # not a WooCommerce store
-    "cart empty",                # persistent empty-cart (ATC broken at site level)
+    "could not find product",      # no product on store
+    "add to cart failed",           # store has no cart / incompatible
+    "not a pymntpl-paypal store",   # wrong gateway
+    "not a braintree store",        # Magento store without Braintree
+    "bot/firewall",                 # cloudflare / ddos-guard / captcha
+    "non-json response",            # not a WooCommerce store
+    "cart empty",                   # persistent empty-cart (ATC broken at site level)
 ]
 
 _KEEP_DOMAIN_PATTERNS = [
@@ -247,6 +250,8 @@ def _scan_worker(
                         result = check_ppcp(sess, domain, card_tuple)
                     elif gateway == "pymntpl":
                         result = check_pymntpl(sess, domain, card_tuple)
+                    elif gateway == "b3magento":
+                        result = check_b3magento(sess, domain, card_tuple)
                     else:
                         result = check_authnet(
                             sess, domain, "",   # "" → auto-discover product_id
@@ -406,7 +411,7 @@ def scan():
 
     user_proxy = str(data.get("proxy",   "") or "").strip()
     gateway    = str(data.get("gateway", "authnet") or "authnet").strip().lower()
-    if gateway not in ("authnet", "ppcp", "pymntpl"):
+    if gateway not in ("authnet", "ppcp", "pymntpl", "b3magento"):
         gateway = "authnet"
 
     # Parse cards: cc|mm|yy[|cvv]

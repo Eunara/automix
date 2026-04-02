@@ -174,10 +174,11 @@
       background:rgba(255,255,255,.05); color:#aaa;
       transition:all .18s ease; user-select:none;
     }
-    .gw-pill.active-authnet  { background:rgba(0,123,255,.25);  border-color:rgba(0,123,255,.5);  color:#fff; box-shadow:0 0 8px rgba(0,123,255,.35); }
-    .gw-pill.active-ppcp     { background:rgba(0,150,220,.25);  border-color:rgba(0,150,220,.5);  color:#fff; box-shadow:0 0 8px rgba(0,150,220,.35); }
-    .gw-pill.active-pymntpl  { background:rgba(103,58,183,.25); border-color:rgba(103,58,183,.5); color:#fff; box-shadow:0 0 8px rgba(103,58,183,.35); }
-    .gw-pill:not(.active-authnet):not(.active-ppcp):not(.active-pymntpl):hover { background:rgba(255,255,255,.1); color:#ddd; }
+    .gw-pill.active-authnet   { background:rgba(0,123,255,.25);  border-color:rgba(0,123,255,.5);  color:#fff; box-shadow:0 0 8px rgba(0,123,255,.35); }
+    .gw-pill.active-ppcp      { background:rgba(0,150,220,.25);  border-color:rgba(0,150,220,.5);  color:#fff; box-shadow:0 0 8px rgba(0,150,220,.35); }
+    .gw-pill.active-pymntpl   { background:rgba(103,58,183,.25); border-color:rgba(103,58,183,.5); color:#fff; box-shadow:0 0 8px rgba(103,58,183,.35); }
+    .gw-pill.active-b3magento { background:rgba(230,81,0,.25);   border-color:rgba(230,81,0,.5);   color:#fff; box-shadow:0 0 8px rgba(230,81,0,.35); }
+    .gw-pill:not(.active-authnet):not(.active-ppcp):not(.active-pymntpl):not(.active-b3magento):hover { background:rgba(255,255,255,.1); color:#ddd; }
 
     /* ----- Result panels ----- */
     .result-body { display:none; word-break:break-all; font-size:.82rem; line-height:1.9; }
@@ -238,9 +239,10 @@
         <div class="card-header h5">
           <span>EONX CHECKER</span>
           <div class="gw-pills">
-            <span class="gw-pill active-authnet" id="pillAuthnet"  onclick="setGateway('authnet')">AUTHNET</span>
-            <span class="gw-pill" id="pillPpcp"     onclick="setGateway('ppcp')">PPCP</span>
-            <span class="gw-pill" id="pillPymntpl"  onclick="setGateway('pymntpl')">PYMNTPL</span>
+            <span class="gw-pill active-authnet" id="pillAuthnet"    onclick="setGateway('authnet')">AUTHNET</span>
+            <span class="gw-pill" id="pillPpcp"       onclick="setGateway('ppcp')">PPCP</span>
+            <span class="gw-pill" id="pillPymntpl"    onclick="setGateway('pymntpl')">PYMNTPL</span>
+            <span class="gw-pill" id="pillB3magento"  onclick="setGateway('b3magento')">B3 MAGENTO</span>
           </div>
         </div>
         <div class="card-body">
@@ -437,14 +439,16 @@ let _badDomains  = [];
 
 // ─── Gateway selector ───────────────────────────────────────────────────────────
 const _GW_DOMAIN_HINTS = {
-  authnet:  'AuthNet stores (one per line) — leave blank to use saved sites',
-  ppcp:     'PPCP / PayPal stores (one per line) — leave blank to use saved sites',
-  pymntpl:  'PaymentPlugins PayPal stores (one per line) — leave blank to use saved sites',
+  authnet:   'AuthNet stores (one per line) — leave blank to use saved sites',
+  ppcp:      'PPCP / PayPal stores (one per line) — leave blank to use saved sites',
+  pymntpl:   'PaymentPlugins PayPal stores (one per line) — leave blank to use saved sites',
+  b3magento: 'Braintree Magento 2 stores (one per line) — leave blank to use saved sites',
 };
 function setGateway(gw) {
   _gateway = gw;
-  ['authnet','ppcp','pymntpl'].forEach(g => {
-    const pill = document.getElementById('pill' + g.charAt(0).toUpperCase() + g.slice(1));
+  ['authnet','ppcp','pymntpl','b3magento'].forEach(g => {
+    const id   = 'pill' + g.replace(/(?:^|-)([a-z])/g, (_, c) => c.toUpperCase());
+    const pill = document.getElementById(id);
     if (pill) pill.className = 'gw-pill' + (g === gw ? ' active-' + g : '');
   });
   const lbl = document.querySelector('#domainGroup label');
@@ -527,7 +531,7 @@ function loadSession() {
       document.getElementById('threadVal').textContent = t;
     }
     if (p) document.getElementById('proxyInput').value = p;
-    if (gw && ['authnet','ppcp','pymntpl'].includes(gw)) setGateway(gw);
+    if (gw && ['authnet','ppcp','pymntpl','b3magento'].includes(gw)) setGateway(gw);
     ['cardGroup','domainGroup'].forEach(id => {
       const grp = document.getElementById(id);
       const inp = grp && grp.querySelector('textarea');
