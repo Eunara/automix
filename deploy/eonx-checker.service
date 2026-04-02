@@ -9,9 +9,9 @@ Group=www-data
 WorkingDirectory=/var/www/automix.eonx.ph
 ExecStart=/home/administrator/.local/bin/gunicorn app:app \
     --bind 127.0.0.1:5052 \
-    --workers 14 \
+    --workers 1 \
     --worker-class gthread \
-    --threads 4 \
+    --threads 64 \
     --timeout 180 \
     --keep-alive 5 \
     --access-logfile - \
