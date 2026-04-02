@@ -373,21 +373,67 @@ ADDRESS_POOLS: dict = {
         {"street": "1 Microsoft Way",            "city": "Redmond",       "zip": "98052", "state": "WA", "phone": "+1 425-882-8080"},
         {"street": "1600 Pennsylvania Avenue NW","city": "Washington",    "zip": "20500", "state": "DC", "phone": "+1 202-456-1111"},
     ],
+    "DE": [
+        {"street": "Unter den Linden 77",         "city": "Berlin",        "zip": "10117", "state": "Berlin",          "phone": "+49 30 12345678"},
+        {"street": "Maximilianstrasse 12",        "city": "Munich",        "zip": "80539", "state": "Bavaria",          "phone": "+49 89 98765432"},
+        {"street": "Zeil 106",                    "city": "Frankfurt",     "zip": "60313", "state": "Hesse",            "phone": "+49 69 11223344"},
+        {"street": "Jungfernstieg 20",            "city": "Hamburg",       "zip": "20354", "state": "Hamburg",          "phone": "+49 40 55667788"},
+    ],
+    "FR": [
+        {"street": "15 Rue de Rivoli",            "city": "Paris",         "zip": "75001", "state": "Ile-de-France",    "phone": "+33 1 42 86 12 34"},
+        {"street": "20 Rue de la Republique",     "city": "Lyon",          "zip": "69002", "state": "Auvergne-Rhone",   "phone": "+33 4 72 10 20 30"},
+        {"street": "5 Cours du Chapeau Rouge",    "city": "Bordeaux",      "zip": "33000", "state": "Nouvelle-Aquitaine","phone": "+33 5 56 44 55 66"},
+        {"street": "30 Rue Saint-Ferreol",        "city": "Marseille",     "zip": "13001", "state": "Provence-PACA",    "phone": "+33 4 91 33 44 55"},
+    ],
+    "IT": [
+        {"street": "Via del Corso 12",             "city": "Rome",          "zip": "00186", "state": "Lazio",            "phone": "+39 06 1234 5678"},
+        {"street": "Via Montenapoleone 8",         "city": "Milan",         "zip": "20121", "state": "Lombardy",          "phone": "+39 02 9876 5432"},
+        {"street": "Via Toledo 200",               "city": "Naples",        "zip": "80132", "state": "Campania",          "phone": "+39 081 234 5678"},
+        {"street": "Piazza della Repubblica 1",   "city": "Florence",      "zip": "50123", "state": "Tuscany",           "phone": "+39 055 111 2233"},
+    ],
+    "ES": [
+        {"street": "Calle Gran Via 28",            "city": "Madrid",        "zip": "28013", "state": "Community of Madrid","phone": "+34 91 123 4567"},
+        {"street": "La Rambla 100",                "city": "Barcelona",     "zip": "08002", "state": "Catalonia",          "phone": "+34 93 987 6543"},
+        {"street": "Calle Sierpes 50",             "city": "Seville",       "zip": "41004", "state": "Andalusia",          "phone": "+34 95 234 5678"},
+        {"street": "Calle Colon 15",               "city": "Valencia",      "zip": "46004", "state": "Valencia",           "phone": "+34 96 345 6789"},
+    ],
+    "IE": [
+        {"street": "1 Grafton Street",             "city": "Dublin",        "zip": "D02 H896", "state": "County Dublin",  "phone": "+353 1 234 5678"},
+        {"street": "37 Patrick Street",            "city": "Cork",          "zip": "T12 V9W2", "state": "County Cork",    "phone": "+353 21 345 6789"},
+        {"street": "15 Shop Street",               "city": "Galway",        "zip": "H91 X2N8", "state": "County Galway",  "phone": "+353 91 456 7890"},
+    ],
 }
 
 
 def get_country_for_domain(domain: str) -> str:
     """Return ISO-2 country code based on domain TLD."""
     d = domain.lower()
-    if d.endswith(".co.uk") or d.endswith(".org.uk") or d.endswith(".me.uk"):
+    # UK
+    if d.endswith(".co.uk") or d.endswith(".org.uk") or d.endswith(".me.uk") or d.endswith(".uk"):
         return "GB"
-    if d.endswith(".com.au") or d.endswith(".net.au") or d.endswith(".org.au"):
+    # Australia
+    if d.endswith(".com.au") or d.endswith(".net.au") or d.endswith(".org.au") or d.endswith(".au"):
         return "AU"
+    # Ireland
+    if d.endswith(".ie"):
+        return "IE"
+    # Germany
+    if d.endswith(".de"):
+        return "DE"
+    # France
+    if d.endswith(".fr"):
+        return "FR"
+    # Italy
+    if d.endswith(".it"):
+        return "IT"
+    # Spain
+    if d.endswith(".es"):
+        return "ES"
     if d.endswith(".ca"):
         return "CA"
-    if d.endswith(".co.nz") or d.endswith(".net.nz"):
+    if d.endswith(".co.nz") or d.endswith(".net.nz") or d.endswith(".nz"):
         return "NZ"
-    if d.endswith(".sg"):
+    if d.endswith(".com.sg") or d.endswith(".sg"):
         return "SG"
     if d.endswith(".my"):
         return "MY"
@@ -395,13 +441,13 @@ def get_country_for_domain(domain: str) -> str:
         return "PH"
     if d.endswith(".nl"):
         return "NL"
-    if d.endswith(".co.za"):
+    if d.endswith(".co.za") or d.endswith(".za"):
         return "ZA"
     if d.endswith(".hk"):
         return "HK"
-    if d.endswith(".th"):
+    if d.endswith(".co.th") or d.endswith(".th"):
         return "TH"
-    if d.endswith(".jp"):
+    if d.endswith(".co.jp") or d.endswith(".jp"):
         return "JP"
     return "US"
 
