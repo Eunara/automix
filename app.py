@@ -410,20 +410,24 @@ def stream(job_id: str):
         return jsonify({"error": "Job not found"}), 404
 
     def generate():
-        while True:
-            if job.get("stop") and job["status"] != "done":
-                job["status"] = "done"
-                job["queue"].put(json.dumps({
-                    "type": "done", "total": job["total"],
-                    "live": job["live"], "dead": job["dead"], "unknown": job["unknown"],
-                }))
-            try:
-                msg = job["queue"].get(timeout=30)
-                yield f"data: {msg}\n\n"
-                if json.loads(msg).get("type") == "done":
-                    break
-            except q_mod.Empty:
-                yield 'data: {"type":"ping"}\n\n'
+        try:
+            while True:
+                if job.get("stop") and job["status"] != "done":
+                    job["status"] = "done"
+                    job["queue"].put(json.dumps({
+                        "type": "done", "total": job["total"],
+                        "live": job["live"], "dead": job["dead"], "unknown": job["unknown"],
+                    }))
+                try:
+                    msg = job["queue"].get(timeout=30)
+                    yield f"data: {msg}\n\n"
+                    if json.loads(msg).get("type") == "done":
+                        break
+                except q_mod.Empty:
+                    yield 'data: {"type":"ping"}\n\n'
+        except GeneratorExit:
+            # Client disconnected (page reload / close) — stop the job
+            job["stop"] = True
 
     return Response(
         generate(),

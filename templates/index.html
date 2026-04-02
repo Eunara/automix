@@ -781,7 +781,8 @@ async function copyCards(type) {
 
 // ─── Auto-stop on page unload (reload / navigate away) ──────────────────────
 window.addEventListener('beforeunload', () => {
-  if (_running && _jobId) {
+  // Stop if a job exists — covers both running state and in-flight reload
+  if (_jobId) {
     navigator.sendBeacon('/stop/' + _jobId);
   }
 });
