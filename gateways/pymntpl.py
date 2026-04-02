@@ -19,7 +19,6 @@ Flow:
 All shared helpers live in utils.py.
 """
 
-import base64
 import json
 import re
 from urllib.parse import urlencode
@@ -242,22 +241,35 @@ def check_pymntpl(session: requests.Session, domain: str, card_tuple: tuple, **k
 
     amount = _extract_amount(checkout_html)
 
-    # ── 5. Get PayPal access token (clientId + empty secret) ─────────────────
-    access_token = ""
-    try:
-        tok_r = requests.post(
-            "https://api.paypal.com/v1/oauth2/token",
-            data={"grant_type": "client_credentials"},
-            headers={
-                "Authorization": "Basic " + base64.b64encode(f"{client_id}:".encode()).decode(),
-                "Content-Type":  "application/x-www-form-urlencoded",
-            },
-            timeout=REQUEST_TIMEOUT,
-            verify=False,
-        )
-        access_token = tok_r.json().get("access_token", "")
-    except Exception:
-        pass
+    # ── 5. Get PayPal access token from checkout page config or WP endpoint ──
+    # Priority: 1) wcPPCPSettings config fields  2) WP REST client-token endpoint
+    # We never call PayPal OAuth directly — the plugin manages auth server-side.
+    access_token = (
+        cfg.get("access_token") or cfg.get("accessToken") or
+        gd.get("access_token") or gd.get("accessToken") or
+        gd.get("clientToken")  or ""
+    )
+
+    if not access_token:
+        # Ask the plugin's own endpoint for the client/bearer token
+        try:
+            tok_r = session.get(
+                base_url + "/?wc-ajax=wc_ppcp_frontend_request&path=/wc-ppcp/v1/client-token",
+                headers={
+                    "X-WP-Nonce": wp_nonce,
+                    "User-Agent": ua,
+                    "Accept":     "application/json",
+                    "Referer":    base_url + checkout_path,
+                },
+                timeout=REQUEST_TIMEOUT,
+            )
+            _tok = tok_r.json()
+            access_token = (
+                _tok.get("access_token") or _tok.get("accessToken") or
+                _tok.get("client_token") or _tok.get("token") or ""
+            )
+        except Exception:
+            pass
 
     # ── 6. Create PayPal order via pymntpl REST route ─────────────────────────
     # create_order_url may be absolute (https://...) or relative (/wp-json/...)
