@@ -18,7 +18,7 @@ from .utils import (
     convert_year,
     detect_card_type,
     discover_product_id,
-    get_billing_identity,
+    fetch_identity,
     get_str,
     random_ua,
     session_id,
@@ -71,8 +71,8 @@ def check_authnet(
                 "card":    card_str,
             }
 
-    # Resolve billing identity based on domain TLD (UK domain → UK address, etc.)
-    identity = get_billing_identity(authnet_domain)
+    # fetch_identity uses the local eonxgen API (127.0.0.1:8001) — no proxy needed
+    identity = fetch_identity(build_plain_session())
     first    = identity["fname"]
     last     = identity["lname"]
     password = identity["password"]
@@ -82,7 +82,6 @@ def check_authnet(
     zip_     = identity["zip"]
     email    = identity["email"]
     phone    = identity["phone"]
-    country  = identity.get("country", "US")
 
     # ── 1. Add to cart (retry up to 10×) ──────────────────────────────────────
     atc_ok = False
@@ -175,7 +174,7 @@ def check_authnet(
         "billing_first_name":  first,
         "billing_last_name":   last,
         "billing_company":     "",
-        "billing_country":     country,
+        "billing_country":     "US",
         "billing_address_1":   street,
         "billing_address_2":   "",
         "billing_city":        city,
