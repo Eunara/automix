@@ -311,7 +311,7 @@
               <textarea id="domainInput" class="md-textarea form-control" rows="3"
                 autocomplete="off" spellcheck="false"
                 aria-label="Domain input field"></textarea>
-              <label for="domainInput">Domains (one per line)</label>
+              <label for="domainInput">Enter target store URLs</label>
             </div>
           </div>
 
@@ -475,10 +475,10 @@ let _badDomains  = [];
 
 // ─── Gateway selector ───────────────────────────────────────────────────────────
 const _GW_DOMAIN_HINTS = {
-  authnet:   'AuthNet stores (one per line)',
-  ppcp:      'PPCP / PayPal stores (one per line)',
-  pymntpl:   'PaymentPlugins PayPal stores (one per line)',
-  b3magento: 'Braintree Magento 2 stores (one per line)',
+  authnet:   'AuthNet — enter target store URLs',
+  ppcp:      'PayPal / PPCP — enter target store URLs',
+  pymntpl:   'PaymentPlugins — enter target store URLs',
+  b3magento: 'Magento 2 / Braintree — enter target store URLs',
 };
 function setGateway(gw) {
   _gateway = gw;
