@@ -24,6 +24,7 @@ from .utils import (
     REQUEST_TIMEOUT,
     build_plain_session,
     convert_year,
+    exc_msg,
     get_billing_identity,
     get_country_for_domain,
     random_ua,
@@ -344,7 +345,7 @@ def check_b3woo(session: requests.Session, domain: str, card_tuple: tuple, **kwa
                 if r.text.strip():
                     atc_ok = True
     except Exception as exc:
-        return {"status": "unknown", "message": f"ATC error: {exc}", "amount": "", "card": card_str}
+        return {"status": "unknown", "message": f"ATC error: {exc_msg(exc)}", "amount": "", "card": card_str}
 
     if not atc_ok:
         return {"status": "unknown", "message": "Add to cart failed", "amount": "", "card": card_str}
@@ -587,4 +588,4 @@ def check_b3woo(session: requests.Session, domain: str, card_tuple: tuple, **kwa
         )
         return _classify(r.text, r.status_code, amount, card_str)
     except Exception as exc:
-        return {"status": "unknown", "message": f"Checkout submit: {exc}", "amount": amount, "card": card_str}
+        return {"status": "unknown", "message": f"Checkout submit: {exc_msg(exc)}", "amount": amount, "card": card_str}

@@ -30,6 +30,7 @@ from .utils import (
     REQUEST_TIMEOUT,
     convert_year,
     discover_product_id,
+    exc_msg,
     get_billing_identity,
     get_country_for_domain,
     random_ua,
@@ -232,7 +233,7 @@ def check_pymntpl(session: requests.Session, domain: str, card_tuple: tuple, **k
                 atc_ok = True
                 break
         except Exception as exc:
-            return {"status": "unknown", "message": f"ATC error: {exc}", "amount": "", "card": card_str}
+            return {"status": "unknown", "message": f"ATC error: {exc_msg(exc)}", "amount": "", "card": card_str}
 
     if not atc_ok:
         return {"status": "unknown", "message": "Add to cart failed", "amount": "", "card": card_str}
@@ -254,7 +255,7 @@ def check_pymntpl(session: requests.Session, domain: str, card_tuple: tuple, **k
         base_domain = parsed_base.netloc   # may be www.domain.com
         base_url    = f"{parsed_base.scheme}://{base_domain}"
     except Exception as exc:
-        return {"status": "unknown", "message": f"Checkout load: {exc}", "amount": "", "card": card_str}
+        return {"status": "unknown", "message": f"Checkout load: {exc_msg(exc)}", "amount": "", "card": card_str}
 
     # Guard: must be checkout page (not cart redirect)
     if "woocommerce-process-checkout-nonce" not in checkout_html:
@@ -439,6 +440,6 @@ def check_pymntpl(session: requests.Session, domain: str, card_tuple: tuple, **k
         )
         payment_text = pay_r.text
     except Exception as exc:
-        return {"status": "unknown", "message": f"Checkout submit: {exc}", "amount": amount, "card": card_str}
+        return {"status": "unknown", "message": f"Checkout submit: {exc_msg(exc)}", "amount": amount, "card": card_str}
 
     return _classify(payment_text, amount, card_str)

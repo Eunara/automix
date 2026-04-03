@@ -34,6 +34,22 @@ def random_ua() -> str:
     return random.choice(BROWSER_UAs)
 
 
+def exc_msg(exc: Exception) -> str:
+    """Return a short, human-readable error string from an exception.
+    Collapses verbose proxy/connection errors into a single word."""
+    s = str(exc).lower()
+    if "proxy" in s or "tunnel" in s or "connect to proxy" in s:
+        return "Proxy error"
+    if "timeout" in s or "timed out" in s:
+        return "Timeout"
+    if "ssl" in s or "certificate" in s:
+        return "SSL error"
+    if "connection" in s or "remote" in s or "network" in s:
+        return "Connection error"
+    # Fallback: first 80 chars
+    return str(exc)[:80]
+
+
 # ── Proxy / Session builders ──────────────────────────────────────────────────
 
 PROXIES: dict = {

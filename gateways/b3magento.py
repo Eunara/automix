@@ -31,6 +31,7 @@ from .utils import (
     REQUEST_TIMEOUT,
     build_plain_session,
     convert_year,
+    exc_msg,
     get_billing_identity,
     get_country_for_domain,
     random_ua,
@@ -399,7 +400,7 @@ def check_b3magento(session: requests.Session, domain: str, card_tuple: tuple, *
             if r.status_code in (200, 201):
                 atc_ok = True
         except Exception as exc:
-            return {"status": "unknown", "message": f"ATC error: {exc}", "amount": "", "card": card_str}
+            return {"status": "unknown", "message": f"ATC error: {exc_msg(exc)}", "amount": "", "card": card_str}
 
     if not atc_ok:
         # Form-based ATC — works with product_id, no SKU needed
@@ -432,7 +433,7 @@ def check_b3magento(session: requests.Session, domain: str, card_tuple: tuple, *
                     if isinstance(cart_data, dict) and cart_data.get("items_count", 0) > 0:
                         atc_ok = True
         except Exception as exc:
-            return {"status": "unknown", "message": f"ATC error: {exc}", "amount": "", "card": card_str}
+            return {"status": "unknown", "message": f"ATC error: {exc_msg(exc)}", "amount": "", "card": card_str}
 
     if not atc_ok:
         return {"status": "unknown", "message": "Add to cart failed", "amount": "", "card": card_str}

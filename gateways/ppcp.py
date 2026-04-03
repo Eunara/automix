@@ -19,6 +19,7 @@ from .utils import (
     REQUEST_TIMEOUT,
     convert_year,
     discover_product_id,
+    exc_msg,
     get_billing_identity,
     get_country_for_domain,
     get_str,
@@ -186,7 +187,7 @@ def check_ppcp(session: requests.Session, domain: str, card_tuple: tuple, **kwar
                 atc_ok = True
                 break
         except Exception as exc:
-            return {"status": "unknown", "message": f"ATC error: {exc}", "amount": "", "card": card_str}
+            return {"status": "unknown", "message": f"ATC error: {exc_msg(exc)}", "amount": "", "card": card_str}
 
     if not atc_ok:
         return {"status": "unknown", "message": "Add to cart failed", "amount": "", "card": card_str}
@@ -200,7 +201,7 @@ def check_ppcp(session: requests.Session, domain: str, card_tuple: tuple, **kwar
         )
         checkout_html = r.text
     except Exception as exc:
-        return {"status": "unknown", "message": f"Checkout load: {exc}", "amount": "", "card": card_str}
+        return {"status": "unknown", "message": f"Checkout load: {exc_msg(exc)}", "amount": "", "card": card_str}
 
     # Guard: if checkout redirected back to cart (empty cart), bail early
     if "woocommerce-process-checkout-nonce" not in checkout_html:
@@ -411,6 +412,6 @@ def check_ppcp(session: requests.Session, domain: str, card_tuple: tuple, **kwar
         )
         payment_text = r.text or ""
     except Exception as exc:
-        return {"status": "unknown", "message": f"Checkout POST: {exc}", "amount": amount, "card": card_str}
+        return {"status": "unknown", "message": f"Checkout POST: {exc_msg(exc)}", "amount": amount, "card": card_str}
 
     return _classify(payment_text, amount, card_str)
