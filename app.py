@@ -173,6 +173,7 @@ _BAD_SITE_PATTERNS = [
     "bot/firewall",                 # cloudflare / ddos-guard / captcha
     "non-json response",            # not a WooCommerce store
     "cart empty",                   # persistent empty-cart (ATC broken at site level)
+    "braintree sandbox",            # site uses Braintree test/sandbox account
 ]
 
 _KEEP_DOMAIN_PATTERNS = [

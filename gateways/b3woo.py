@@ -357,6 +357,9 @@ def check_b3woo(session: requests.Session, domain: str, card_tuple: tuple, **kwa
         decoded        = json.loads(base64.b64decode(client_token_raw + pad))
         b3_fingerprint = decoded["authorizationFingerprint"]
         merchant_id    = decoded["merchantId"]
+        # Reject sites running on Braintree sandbox — they are test stores
+        if decoded.get("environment") == "sandbox":
+            return {"status": "unknown", "message": "braintree sandbox (test store)", "amount": amount, "card": card_str}
         bt_graphql_url = (
             decoded.get("graphQL", {}).get("url")
             or "https://payments.braintree-api.com/graphql"
