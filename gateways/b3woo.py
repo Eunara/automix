@@ -357,6 +357,14 @@ def check_b3woo(session: requests.Session, domain: str, card_tuple: tuple, **kwa
         decoded        = json.loads(base64.b64decode(client_token_raw + pad))
         b3_fingerprint = decoded["authorizationFingerprint"]
         merchant_id    = decoded["merchantId"]
+        bt_graphql_url = (
+            decoded.get("graphQL", {}).get("url")
+            or "https://payments.braintree-api.com/graphql"
+        )
+        bt_client_api_url = (
+            decoded.get("clientApiUrl")
+            or f"https://api.braintreegateway.com/merchants/{merchant_id}/client_api"
+        ).rstrip("/")
     except Exception as exc:
         return {"status": "unknown", "message": f"clientToken decode: {exc}", "amount": amount, "card": card_str}
 
@@ -364,7 +372,7 @@ def check_b3woo(session: requests.Session, domain: str, card_tuple: tuple, **kwa
     bt_token = ""
     try:
         r = build_plain_session().post(
-            "https://payments.braintree-api.com/graphql",
+            bt_graphql_url,
             json={
                 "clientSdkMetadata": {
                     "source":      "client",
@@ -430,8 +438,7 @@ def check_b3woo(session: requests.Session, domain: str, card_tuple: tuple, **kwa
 
     try:
         r = build_plain_session().post(
-            f"https://api.braintreegateway.com/merchants/{merchant_id}"
-            f"/client_api/v1/payment_methods/{bt_token}/three_d_secure/lookup",
+            f"{bt_client_api_url}/v1/payment_methods/{bt_token}/three_d_secure/lookup",
             json={
                 "amount":       amount_numeric,
                 "additionalInfo": {
