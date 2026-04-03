@@ -101,6 +101,10 @@ def _classify(response_text: str, http_status: int, amount: str, card_str: str) 
         msg = re.sub(r"<[^>]+>", " ", response_text[:400])
         msg = re.sub(r"\s+", " ", msg).strip()[:200]
 
+    # If message contains "Reason:", keep only the part after it
+    if "reason:" in msg.lower():
+        msg = re.split(r"[Rr]eason\s*:", msg, maxsplit=1)[-1].strip()
+
     combined = (msg + " " + response_text).lower()
     for kw in _DEAD_KEYWORDS:
         if kw in combined:
