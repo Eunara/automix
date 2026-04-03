@@ -373,10 +373,9 @@ def check_b3woo(session: requests.Session, domain: str, card_tuple: tuple, **kwa
         )
         bt_data  = r.json()
         bt_token = (
-            bt_data.get("data", {})
-                   .get("tokenizeCreditCard", {})
-                   .get("token", "")
-        )
+            (bt_data.get("data") or {})
+                   .get("tokenizeCreditCard") or {}
+        ).get("token", "")
     except Exception as exc:
         return {"status": "unknown", "message": f"BT tokenize error: {exc}", "amount": amount, "card": card_str}
 
