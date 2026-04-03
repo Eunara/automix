@@ -142,6 +142,7 @@ threading.Thread(target=_reaper, daemon=True).start()
 # ── Telegram sender (wraps utils.send_telegram) ──────────────────────────────
 def _tg_live(text: str) -> None:
     """Send live card hit to the configured Telegram group via utils.send_telegram."""
+    threading.Thread(target=send_telegram, args=(text,), daemon=True).start()
 
 
 # ── Bad-site classifier ───────────────────────────────────────────────────────
@@ -198,8 +199,6 @@ def _is_bad_site_error(message: str) -> bool:
         if pat in msg:
             return True
     return False
-
-    threading.Thread(target=send_telegram, args=(text,), daemon=True).start()
 
 
 # ── Worker ────────────────────────────────────────────────────────────────────
