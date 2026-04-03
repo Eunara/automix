@@ -418,6 +418,10 @@
               <span id="cDone" class="badge badge-info" aria-live="polite">0</span>
             </div>
             <div class="d-flex justify-content-between align-items-center mb-2">
+              <span>Bad Sites :</span>
+              <span id="cBad" class="badge badge-danger" aria-live="polite">0</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
               <span>Total Cards :</span>
               <span id="cTotal" class="badge badge-primary" aria-live="polite">0</span>
             </div>
@@ -757,6 +761,7 @@ async function startScan() {
   // Reset UI
   _liveLines = []; _deadLines = []; _errLines = []; _liveOpened = false;
   _badDomains = [];
+  setText('cBad', '0');
   document.querySelector('.aprovadas').innerHTML = '';
   document.querySelector('.reprovadas').innerHTML = '';
   document.querySelector('.none').innerHTML = '';
@@ -826,9 +831,10 @@ async function startScan() {
         setText('cDead2',  msg.dead);
         setText('cError2', msg.unknown);
         setStatus('Running… ' + msg.done + '/' + msg.total, 'badge-info');
-        // Silently remove bad domains from textarea and refresh saved count
+        // Remove bad domains from textarea, update counter and refresh saved count
         if (msg.new_bad_domain && !_badDomains.includes(msg.new_bad_domain)) {
           _badDomains.push(msg.new_bad_domain);
+          setText('cBad', _badDomains.length);
           const ta = document.getElementById('domainInput');
           if (ta) {
             ta.value = ta.value.split('\n')
