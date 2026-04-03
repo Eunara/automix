@@ -122,6 +122,21 @@ def _save_working_site(domain: str, gateway: str) -> None:
     except Exception:
         pass
 
+
+def _remove_working_site(domain: str, gateway: str) -> None:
+    """Remove a bad domain from the gateway's working set and rewrite the file.
+    Called when a domain triggers a structural site error (not just a proxy error).
+    """
+    gw = gateway if gateway in _WORKING_SITES else "authnet"
+    with _SITES_LOCK:
+        _WORKING_SITES[gw].discard(domain)
+        sites = list(_WORKING_SITES[gw])
+    try:
+        with open(WORKING_SITES_FILES[gw], "w", encoding="utf-8") as f:
+            f.write("\n".join(sites) + ("\n" if sites else ""))
+    except Exception:
+        pass
+
 # ── Job reaper ────────────────────────────────────────────────────────────────
 def _reaper() -> None:
     while True:
@@ -280,6 +295,8 @@ def _scan_worker(
                         _bad_domains.add(domain)
                     new_bad_domain = domain
                     job["bad_count"] = len(_bad_domains)
+                    # Purge from persistent saved sites so it won't load next time
+                    _remove_working_site(domain, gateway)
                     good = [d for d in domains if d not in _bad_domains]
                     if good:
                         domain = good[0]
