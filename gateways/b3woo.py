@@ -113,7 +113,36 @@ def _classify(response_text: str, http_status: int, amount: str, card_str: str) 
 
 # -- Product discovery --------------------------------------------------------
 def _discover_product(session: requests.Session, domain: str, ua: str):
-    """Return product_id string, or None if nothing found."""
+    """Return cheapest product_id string, or None if nothing found."""
+    # Try WooCommerce Store REST API with price sort first
+    for api_url in (
+        f"https://{domain}/wp-json/wc/store/v1/products?per_page=5&orderby=price&order=asc&status=publish",
+        f"https://{domain}/wp-json/wc/store/v1/products?per_page=5&orderby=price&order=asc",
+    ):
+        try:
+            r = session.get(api_url, headers={"User-Agent": ua}, timeout=REQUEST_TIMEOUT)
+            if r.status_code == 200:
+                data = r.json()
+                if isinstance(data, list) and data:
+                    best_id = ""
+                    best_price = float("inf")
+                    for item in data:
+                        pid = str(item.get("id", ""))
+                        if not pid:
+                            continue
+                        try:
+                            price = float(str(item.get("prices", {}).get("price", "0")).replace(",", "") or "0") / 100
+                        except Exception:
+                            price = 0.0
+                        if price < best_price or not best_id:
+                            best_price = price
+                            best_id = pid
+                    if best_id:
+                        return best_id
+        except Exception:
+            continue
+
+    # HTML scraping fallback
     for path in ("/shop/", "/", "/store/", "/shop"):
         try:
             r = session.get(

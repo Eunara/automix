@@ -522,9 +522,9 @@ def _cache_put(domain: str, product_id: str) -> None:
 
 
 def discover_product_id(session: requests.Session, domain: str) -> str:
-    """Auto-discover a purchasable product_id from a WooCommerce store.
+    """Auto-discover the cheapest purchasable product_id from a WooCommerce store.
 
-    Tries /shop/, /, /store/, /products/ in order.
+    Tries WooCommerce Store REST API (price ASC) first, then HTML scraping.
     Caches up to 500 results per server process (LRU eviction).
     Returns product_id string, or "" if nothing found.
     """
@@ -532,7 +532,42 @@ def discover_product_id(session: requests.Session, domain: str) -> str:
         _PRODUCT_CACHE.move_to_end(domain)
         return _PRODUCT_CACHE[domain]
 
-    ua    = random_ua()
+    ua = random_ua()
+
+    # ── 1. WooCommerce Store REST API — cheapest product first ───────────────
+    for api_url in (
+        f"https://{domain}/wp-json/wc/store/v1/products?per_page=5&orderby=price&order=asc&status=publish",
+        f"https://{domain}/wp-json/wc/store/v1/products?per_page=5&orderby=price&order=asc",
+        f"https://{domain}/wp-json/wc/store/v1/products?per_page=1",
+    ):
+        try:
+            r = session.get(api_url, headers={"User-Agent": ua}, timeout=REQUEST_TIMEOUT)
+            if r.status_code == 200:
+                data = r.json()
+                if isinstance(data, list) and data:
+                    # Pick the one with the lowest numeric price
+                    best_id = ""
+                    best_price = float("inf")
+                    for item in data:
+                        pid = str(item.get("id", ""))
+                        if not pid:
+                            continue
+                        try:
+                            price = float(str(item.get("prices", {}).get("price", "0")).replace(",", "") or "0") / 100
+                        except Exception:
+                            price = 0.0
+                        if price < best_price or not best_id:
+                            best_price = price
+                            best_id = pid
+                    if best_id:
+                        _cache_put(domain, best_id)
+                        return best_id
+        except Exception:
+            continue
+
+    # ── 2. HTML scraping fallback ─────────────────────────────────────────────
+    # Some stores return add-to-cart buttons with prices in the HTML.
+    # We try to extract product IDs along with their displayed prices and pick the cheapest.
     paths = ["/shop/", "/", "/store/", "/products/"]
     for path in paths:
         try:
@@ -543,15 +578,31 @@ def discover_product_id(session: requests.Session, domain: str) -> str:
             )
             html = r.text
 
-            m = re.search(r'data-product_id=["\']?(\d+)["\']?', html)
-            if m:
-                _cache_put(domain, m.group(1))
-                return m.group(1)
+            # Try to find ALL product IDs + prices from data-post attributes or ATC buttons
+            # Pattern: data-product_id="123" ... woocommerce-Price-amount ...amount
+            # Simple approach: collect all product IDs and associated price spans
+            candidates = []
+            for m in re.finditer(r'data-product_id=["\']?(\d+)["\']?', html):
+                candidates.append(m.group(1))
+            for m in re.finditer(r'[?&]add-to-cart=(\d+)', html):
+                candidates.append(m.group(1))
 
-            m = re.search(r'[?&]add-to-cart=(\d+)', html)
-            if m:
-                _cache_put(domain, m.group(1))
-                return m.group(1)
+            if candidates:
+                # If we found candidates, try to pair them with prices
+                # Extract all prices from the page
+                prices = re.findall(r'woocommerce-Price-amount[^>]*>.*?>([\d.,]+)<', html, re.DOTALL)
+                if prices:
+                    try:
+                        # Use the first candidate paired with the lowest price found
+                        min_price_idx = min(range(len(prices)), key=lambda i: float(prices[i].replace(",", "")))
+                        # Use product ID at same index if available, else first
+                        pid = candidates[min_price_idx] if min_price_idx < len(candidates) else candidates[0]
+                        _cache_put(domain, pid)
+                        return pid
+                    except Exception:
+                        pass
+                _cache_put(domain, candidates[0])
+                return candidates[0]
 
             m = re.search(r'["\']postid["\']\s*:\s*(\d+)', html)
             if m:
@@ -560,22 +611,5 @@ def discover_product_id(session: requests.Session, domain: str) -> str:
 
         except Exception:
             continue
-
-    # ── Fallback: WooCommerce Store REST API (public, no auth required) ───────────
-    # Works for stores where all HTML pages have no add-to-cart buttons
-    try:
-        r = session.get(
-            f"https://{domain}/wp-json/wc/store/v1/products?per_page=1",
-            headers={"User-Agent": ua},
-            timeout=REQUEST_TIMEOUT,
-        )
-        data = r.json()
-        if isinstance(data, list) and data:
-            pid = str(data[0].get("id", ""))
-            if pid:
-                _cache_put(domain, pid)
-                return pid
-    except Exception:
-        pass
 
     return ""
