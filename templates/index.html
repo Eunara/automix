@@ -350,10 +350,7 @@
                   >↻ Load Saved</button>
                 <span id="savedSiteCount" style="font-size:.72rem;color:#888;"></span>
               </div>
-              <div id="badSitesIndicator" style="display:none;align-items:center;gap:.4rem;">
-                <span style="font-size:.78rem;color:#ef5350;font-weight:600;letter-spacing:.04em;">BAD SITES</span>
-                <span id="badSitesBadge" class="badge badge-danger">0</span>
-              </div>
+
             </div>
             <div class="domain-label-group" id="domainGroup">
               <textarea id="domainInput" class="md-textarea form-control" rows="3"
@@ -760,8 +757,6 @@ async function startScan() {
   // Reset UI
   _liveLines = []; _deadLines = []; _errLines = []; _liveOpened = false;
   _badDomains = [];
-  document.getElementById('badSitesIndicator').style.display = 'none';
-  document.getElementById('badSitesBadge').textContent = '0';
   document.querySelector('.aprovadas').innerHTML = '';
   document.querySelector('.reprovadas').innerHTML = '';
   document.querySelector('.none').innerHTML = '';
@@ -831,13 +826,9 @@ async function startScan() {
         setText('cDead2',  msg.dead);
         setText('cError2', msg.unknown);
         setStatus('Running… ' + msg.done + '/' + msg.total, 'badge-info');
-        // Track bad domains — remove from GOOD SITES textarea, update counter
+        // Silently remove bad domains from textarea and refresh saved count
         if (msg.new_bad_domain && !_badDomains.includes(msg.new_bad_domain)) {
           _badDomains.push(msg.new_bad_domain);
-          document.getElementById('badSitesBadge').textContent = _badDomains.length;
-          const ind = document.getElementById('badSitesIndicator');
-          if (ind) ind.style.display = 'flex';
-          // Remove bad domain from the textarea so it won't show as a good site
           const ta = document.getElementById('domainInput');
           if (ta) {
             ta.value = ta.value.split('\n')
@@ -846,6 +837,8 @@ async function startScan() {
             const grp = document.getElementById('domainGroup');
             if (grp) grp.classList.toggle('filled', ta.value.trim() !== '');
           }
+          // Refresh "(N saved)" badge — server already removed it from file
+          _updateSavedSiteCount(_gateway);
         }
         if (msg.status === 'live') {
           const binInfo = msg.bin_info ? ' <span style="color:#b0bec5;font-size:.75em">[' + esc(msg.bin_info) + ']</span>' : '';
