@@ -89,6 +89,7 @@
       backdrop-filter: blur(2px);
       border: 1px solid rgba(255,255,255,.2) !important;
       border-radius: .25rem;
+      min-height: 44px;
       transition: border-color .15s, box-shadow .15s;
     }
     .md-textarea { height: auto; resize: vertical; }
@@ -161,7 +162,7 @@
 
     /* Thread slider */
     .slider-row { display: flex; align-items: center; gap: .75rem; margin-top: .5rem; }
-    .slider-row input[type=range] { flex: 1; accent-color: #007bff; }
+    .slider-row input[type=range] { flex: 1; accent-color: #007bff; height: 4px; cursor: pointer; touch-action: manipulation; }
     .slider-val { font-size: .9rem; color: #aaa; min-width: 24px; text-align: right; }
 
     /* ----- Buttons ----- */
@@ -174,6 +175,7 @@
       transition: all .2s ease;
       backdrop-filter: blur(5px);
       -webkit-backdrop-filter: blur(5px);
+      touch-action: manipulation;
       min-width: 200px;
     }
     .btn:focus { outline: none; box-shadow: 0 0 0 .2rem rgba(0,123,255,.25); }
@@ -246,7 +248,7 @@
     }
 
     /* ----- Result panels ----- */
-    .result-body { display:none; word-break:break-all; font-size:.82rem; line-height:1.9; }
+    .result-body { display:none; word-break:break-all; font-size:.82rem; line-height:1.9; max-height:400px; overflow-y:auto; overscroll-behavior:contain; scroll-behavior:smooth; }
     .result-body .line-live    { color:#4caf50; }
     .result-body .line-dead    { color:#ef5350; }
     .result-body .line-unknown { color:#ffc107; }
@@ -282,20 +284,25 @@
 
     /* ----- Mobile ----- */
     @media (max-width:768px) {
-      .btn.btn-primary, .btn.btn-danger { min-width:unset; width:100%; margin-top:.5rem; }
-      .d-flex.justify-content-around { flex-direction:column; }
+      .btn.btn-primary, .btn.btn-danger { min-width:unset; flex:1; }
+      .btn-row { gap:.75rem; }
       .card-header:not(.h5) { flex-wrap:wrap; gap:.5rem; }
       .card-header.h5 { flex-wrap:wrap; gap:.5rem; }
       .sticky-stats { position:static; }
       #gwSelect { font-size:.72rem; min-width:130px; }
       .card-body { padding:.85rem; }
       .slider-row { gap:.4rem; }
-      .btn.btn-primary.btn-sm, .btn.btn-danger.btn-sm { width:unset; margin-top:0; }
+      .btn.btn-primary.btn-sm, .btn.btn-danger.btn-sm { flex:unset; }
+      .stats-grid { display:grid !important; grid-template-columns:1fr 1fr; gap:.4rem; flex-direction:unset; }
+      .stats-grid > .d-flex { background:rgba(255,255,255,.04); border-radius:.2rem; padding:.35rem .5rem; margin-bottom:0 !important; }
+      .result-body { max-height:260px; }
     }
     @media (max-width:480px) {
       .card-header.h5 > span:first-child { font-size:1rem; }
       #gwSelect { font-size:.7rem; min-width:120px; padding:.25rem 1.7rem .25rem .6rem; }
       .floating-label-group, .domain-label-group { margin-top:1.1rem; }
+      .stats-grid { grid-template-columns:1fr 1fr; }
+      .stats-grid > .d-flex span:first-child { font-size:.78rem; }
     }
     @media (prefers-reduced-motion:reduce) {
       *, *::before, *::after { animation-duration:.01ms!important; transition-duration:.01ms!important; }
@@ -384,7 +391,7 @@
           <div class="progress-wrap mt-4"><div class="progress-bar" id="progressBar"></div></div>
 
           <!-- Buttons -->
-          <div class="d-flex justify-content-around mt-4">
+          <div class="d-flex justify-content-around mt-4 btn-row" style="gap:.75rem;">
             <button class="btn btn-primary" id="btnStart" onclick="startScan()" aria-label="Start">START</button>
             <button class="btn btn-danger"  id="btnStop"  onclick="stopScan()"  aria-label="Stop">STOP</button>
           </div>
@@ -396,7 +403,7 @@
     <div class="col-12 col-md-4 mb-4 sticky-stats">
       <div class="card">
         <div class="card-body">
-          <div class="d-flex flex-column">
+          <div class="d-flex flex-column stats-grid">
             <div class="d-flex justify-content-between align-items-center mb-2">
               <span>Status :</span>
               <span id="status" class="badge badge-primary" aria-live="polite">Idle</span>
