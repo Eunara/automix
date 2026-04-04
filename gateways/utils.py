@@ -6,6 +6,8 @@ Centralises: session builders, proxy config, BIN lookup, identity helpers,
 """
 
 import json
+import logging
+import os
 import random
 import re
 import secrets
@@ -15,6 +17,8 @@ import requests
 import urllib3
 
 urllib3.disable_warnings()
+
+logger = logging.getLogger("eonx_checker.utils")
 
 REQUEST_TIMEOUT = 22
 
@@ -54,12 +58,12 @@ def exc_msg(exc: Exception) -> str:
 
 PROXIES: dict = {
     "proxyverse": {
-        "host": "proxy.proxyverse.io:9200",
-        "auth": "country-us:431583b3-a951-4697-a852-652946d45187",
+        "host": os.environ.get("PROXYVERSE_HOST", "proxy.proxyverse.io:9200"),
+        "auth": os.environ.get("PROXYVERSE_AUTH", ""),
     },
     "rayobyte": {
-        "host": "la.residential.rayobyte.com:8000",
-        "auth": "micojohncherry_gmail_com:micolovekatelyn",
+        "host": os.environ.get("RAYOBYTE_HOST", "la.residential.rayobyte.com:8000"),
+        "auth": os.environ.get("RAYOBYTE_AUTH", ""),
     },
 }
 
