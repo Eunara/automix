@@ -260,7 +260,7 @@ def fetch_identity(plain_session: requests.Session = None) -> dict:
     if plain_session is None:
         plain_session = build_plain_session()
     try:
-        r = plain_session.get("http://127.0.0.1:8001/api?nat=us", timeout=10)
+        r = plain_session.get("https://gen.eonx.ph/api?nat=us", timeout=10)
         data = r.json()
         if data and "person" in data and "address" in data:
             person = data["person"]
