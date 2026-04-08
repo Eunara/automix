@@ -365,6 +365,12 @@
                 aria-label="Domain input field"></textarea>
               <label for="domainInput">Enter target store URLs</label>
             </div>
+            <div style="display:flex;justify-content:flex-end;align-items:center;gap:.5rem;margin-top:.3rem;">
+              <span id="domainCountBadge" style="font-size:.75rem;color:#888;">0 sites</span>
+              <button class="btn btn-outline-secondary btn-sm" onclick="dedupedomains()" title="Remove duplicate sites" style="font-size:.72rem;padding:.15rem .45rem;">
+                <i class="fa-solid fa-filter"></i> Dedupe
+              </button>
+            </div>
           </div>
 
           <!-- Custom proxy input -->
@@ -382,8 +388,7 @@
               Concurrent workers: <span id="threadVal">5</span>
             </div>
             <div class="slider-row">
-              <input type="range" id="threadSlider" min="1" max="10" value="5"
-                oninput="document.getElementById('threadVal').textContent=this.value">
+              <input type="range" id="threadSlider" min="1" max="10" value="5">
             </div>
           </div>
 
@@ -563,6 +568,7 @@ async function _updateSavedSiteCount(gw) {
       ta.value = sites.join('\n');
       const grp = document.getElementById('domainGroup');
       if (grp) grp.classList.add('filled');
+      updateDomainCount();
     }
   } catch(e) {}
 }
@@ -577,6 +583,8 @@ async function loadSavedSites() {
       ta.value = sites.join('\n');
       const grp = document.getElementById('domainGroup');
       if (grp) grp.classList.add('filled');
+      saveSession();
+      updateDomainCount();
       toast('Loaded ' + sites.length + ' saved sites', 'ok');
       const el = document.getElementById('savedSiteCount');
       if (el) el.textContent = '(' + sites.length + ' saved)';
@@ -643,6 +651,7 @@ function saveSession() {
     sessionStorage.setItem('chkr_domains', document.getElementById('domainInput').value);
     sessionStorage.setItem('chkr_threads', document.getElementById('threadSlider').value);
     sessionStorage.setItem('chkr_proxy',   document.getElementById('proxyInput').value);
+    sessionStorage.setItem('chkr_gateway', _gateway);
   } catch(e) {}
 }
 function loadSession() {
@@ -670,10 +679,19 @@ function loadSession() {
 }
 loadSession();
 updateCardCount();
-document.getElementById('lista').addEventListener('input', () => { saveSession(); updateCardCount(); });
+updateDomainCount();
+document.getElementById('lista').addEventListener('input', () => {
+  saveSession();
+  updateCardCount();
+  const lines = document.getElementById('lista').value.split('\n').filter(l => l.trim());
+  if (lines.length > 2000) toast('Warning: ' + lines.length + ' cards — large lists may be slow.', 'warn');
+});
 
-document.getElementById('domainInput').addEventListener('input', saveSession);
-document.getElementById('threadSlider').addEventListener('input', saveSession);
+document.getElementById('domainInput').addEventListener('input', () => { saveSession(); updateDomainCount(); });
+document.getElementById('threadSlider').addEventListener('input', e => {
+  document.getElementById('threadVal').textContent = e.target.value;
+  saveSession();
+});
 document.getElementById('proxyInput').addEventListener('input', saveSession);
 
 // ─── Card count & dedupe ─────────────────────────────────────────────────────
@@ -717,6 +735,32 @@ function removeCard(card) {
   if (grp) grp.classList.toggle('filled', ta.value.trim() !== '');
   updateCardCount();
   saveSession();
+}
+
+function updateDomainCount() {
+  const ta    = document.getElementById('domainInput');
+  const lines = ta.value.split('\n').filter(l => l.trim().length > 0);
+  const badge = document.getElementById('domainCountBadge');
+  if (badge) badge.textContent = lines.length + ' site' + (lines.length !== 1 ? 's' : '');
+}
+
+function dedupedomains() {
+  const ta    = document.getElementById('domainInput');
+  const lines = ta.value.split('\n');
+  const seen  = new Set();
+  const deduped = lines.filter(l => {
+    const d = l.trim().toLowerCase();
+    if (!d) return false;
+    if (seen.has(d)) return false;
+    seen.add(d);
+    return true;
+  });
+  const before = lines.filter(l => l.trim()).length;
+  ta.value = deduped.join('\n');
+  updateDomainCount();
+  saveSession();
+  const removed = before - deduped.length;
+  toast(removed > 0 ? 'Removed ' + removed + ' duplicate site(s).' : 'No duplicate sites found.', removed > 0 ? 'ok' : 'warn');
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -849,7 +893,10 @@ async function startScan() {
               .join('\n');
             const grp = document.getElementById('domainGroup');
             if (grp) grp.classList.toggle('filled', ta.value.trim() !== '');
+            saveSession();
+            updateDomainCount();
           }
+          toast('Bad site removed: ' + msg.new_bad_domain, 'warn');
           // Refresh "(N saved)" badge — server already removed it from file
           _updateSavedSiteCount(_gateway);
         }
