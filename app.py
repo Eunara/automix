@@ -170,10 +170,12 @@ _BAD_SITE_PATTERNS = [
     "not a pymntpl-paypal store",   # wrong gateway
     "not a braintree store",        # Magento store without Braintree
     "not a woocommerce braintree store",  # WooCommerce store without Braintree
-    "bot/firewall",                 # cloudflare / ddos-guard / captcha
+    "bot/firewall",                 # cloudflare / ddos-guard / captcha (all gateways)
     "non-json response",            # not a WooCommerce store
     "cart empty",                   # persistent empty-cart (ATC broken at site level)
     "braintree sandbox",            # site uses Braintree test/sandbox account
+    "ppcp nonces not found",        # WC store without PPCP plugin configured
+    "cart create failed",           # Magento store with broken/auth-required cart API
 ]
 
 _KEEP_DOMAIN_PATTERNS = [

@@ -29,6 +29,7 @@ import requests
 from .utils import (
     REQUEST_TIMEOUT,
     convert_year,
+    detect_bot_page,
     discover_product_id,
     exc_msg,
     get_billing_identity,
@@ -256,6 +257,11 @@ def check_pymntpl(session: requests.Session, domain: str, card_tuple: tuple, **k
         base_url    = f"{parsed_base.scheme}://{base_domain}"
     except Exception as exc:
         return {"status": "unknown", "message": f"Checkout load: {exc_msg(exc)}", "amount": "", "card": card_str}
+
+    # Guard: bot / firewall challenge page
+    _bot = detect_bot_page(checkout_html)
+    if _bot:
+        return {"status": "unknown", "message": f"Bot/Firewall: {_bot.title()}", "amount": "", "card": card_str}
 
     # Guard: must be checkout page (not cart redirect)
     if "woocommerce-process-checkout-nonce" not in checkout_html:

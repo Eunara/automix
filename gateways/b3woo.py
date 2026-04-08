@@ -24,6 +24,7 @@ from .utils import (
     REQUEST_TIMEOUT,
     build_plain_session,
     convert_year,
+    detect_bot_page,
     exc_msg,
     get_billing_identity,
     get_country_for_domain,
@@ -184,9 +185,11 @@ def _discover_product(session: requests.Session, domain: str, ua: str):
 
 # -- Checkout data extraction -------------------------------------------------
 def _get_checkout_data(session: requests.Session, domain: str, ua: str) -> tuple:
-    """Load /checkout/ → (wc_nonce, bt_client_token, amount_str, plugin_type).
+    """Load /checkout/ → (wc_nonce, bt_client_token, amount_str, plugin_type, bot_marker).
 
-    plugin_type is 'skyverge' or 'native'.
+    plugin_type is 'skyverge' or 'native'.  bot_marker is non-empty if a
+    bot/firewall challenge page was detected (in which case all other fields
+    will be empty strings).
     """
     try:
         r = session.get(
@@ -195,6 +198,11 @@ def _get_checkout_data(session: requests.Session, domain: str, ua: str) -> tuple
             timeout=REQUEST_TIMEOUT,
         )
         html = r.text
+
+        # ── Bot / firewall check ──────────────────────────────────────────
+        _bot = detect_bot_page(html)
+        if _bot:
+            return "", "", "", "", _bot
 
         # ── WC process-checkout nonce ─────────────────────────────────────
         nonce = ""
@@ -300,9 +308,9 @@ def _get_checkout_data(session: requests.Session, domain: str, ua: str) -> tuple
             else:
                 amount = raw
 
-        return nonce, client_token, amount, plugin_type
+        return nonce, client_token, amount, plugin_type, ""
     except Exception:
-        return "", "", "", "native"
+        return "", "", "", "native", ""
 
 
 # -- Main checker -------------------------------------------------------------
@@ -351,7 +359,10 @@ def check_b3woo(session: requests.Session, domain: str, card_tuple: tuple, **kwa
         return {"status": "unknown", "message": "Add to cart failed", "amount": "", "card": card_str}
 
     # 3. Load checkout page
-    nonce, client_token_raw, amount, plugin_type = _get_checkout_data(session, domain, ua)
+    nonce, client_token_raw, amount, plugin_type, bot_marker = _get_checkout_data(session, domain, ua)
+
+    if bot_marker:
+        return {"status": "unknown", "message": f"Bot/Firewall: {bot_marker.title()}", "amount": "", "card": card_str}
 
     if not client_token_raw:
         return {"status": "unknown", "message": "Not a WooCommerce Braintree store (no clientToken)", "amount": "", "card": card_str}

@@ -50,6 +50,48 @@ def exc_msg(exc: Exception) -> str:
     return str(exc)[:80]
 
 
+# ── Bot / firewall page detection ─────────────────────────────────────────────
+
+_BOT_MARKERS = (
+    "cf-ray",
+    "cloudflare",
+    "just a moment",
+    "enable javascript",
+    "checking your browser",
+    "ddos-guard",
+    "captcha",
+    "recaptcha",
+    "hcaptcha",
+    "access denied",
+    "403 forbidden",
+    "bot detection",
+    "security check",
+    "please verify",
+    "verify you are human",
+    "your ip has been",
+    "too many requests",
+    "rate limit",
+    "perimeterx",
+    "px-captcha",
+    "sucuri website firewall",
+    "wordfence",
+)
+
+
+def detect_bot_page(html: str) -> str:
+    """Scan a raw HTML string for bot/firewall challenge markers.
+
+    Returns the first matched marker (lowercase) if found, or '' if the
+    page looks clean.  Only call this on full HTML pages, never on JSON
+    API responses.
+    """
+    low = html.lower()
+    for marker in _BOT_MARKERS:
+        if marker in low:
+            return marker
+    return ""
+
+
 # ── Proxy / Session builders ──────────────────────────────────────────────────
 
 PROXIES: dict = {

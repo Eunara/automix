@@ -31,6 +31,7 @@ from .utils import (
     REQUEST_TIMEOUT,
     build_plain_session,
     convert_year,
+    detect_bot_page,
     exc_msg,
     get_billing_identity,
     get_country_for_domain,
@@ -165,6 +166,10 @@ def _warm_session(session: requests.Session, domain: str, ua: str) -> tuple:
                 timeout=REQUEST_TIMEOUT,
             )
             html = r.text
+            # Bot / firewall check — stop immediately if challenge page detected
+            _bot = detect_bot_page(html)
+            if _bot:
+                return f"BOT:{_bot}", rest_prefix
             if not form_key:
                 m = re.search(r'["\']form_key["\']\s*[,:]\s*["\']([^"\'\ ]{5,})["\']', html)
                 if m:
@@ -337,6 +342,9 @@ def _get_client_token(session: requests.Session, domain: str, ua: str) -> str:
             headers={"User-Agent": ua, "Upgrade-Insecure-Requests": "1"},
             timeout=REQUEST_TIMEOUT,
         )
+        _bot = detect_bot_page(r.text)
+        if _bot:
+            return f"BOT:{_bot}"
         # clientToken is a long base64 string; restrict charset to avoid false positives
         m = re.search(r'"clientToken"\s*:\s*"([A-Za-z0-9+/=]{40,})"', r.text)
         if m:
@@ -361,6 +369,8 @@ def check_b3magento(session: requests.Session, domain: str, card_tuple: tuple, *
 
     # 0. Warm session — collect cookies, form_key, and REST store-view prefix
     form_key, rest_prefix = _warm_session(session, domain, ua)
+    if form_key.startswith("BOT:"):
+        return {"status": "unknown", "message": f"Bot/Firewall: {form_key[4:].title()}", "amount": "", "card": card_str}
 
     json_hdrs = {
         "User-Agent":        ua,
@@ -440,6 +450,8 @@ def check_b3magento(session: requests.Session, domain: str, card_tuple: tuple, *
 
     # 4. Fetch Braintree clientToken
     client_token_raw = _get_client_token(session, domain, ua)
+    if client_token_raw.startswith("BOT:"):
+        return {"status": "unknown", "message": f"Bot/Firewall: {client_token_raw[4:].title()}", "amount": "", "card": card_str}
     if not client_token_raw:
         return {"status": "unknown", "message": "Not a Braintree store (no clientToken)", "amount": "", "card": card_str}
 
