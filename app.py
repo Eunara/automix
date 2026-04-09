@@ -5,6 +5,7 @@ Web UI + SSE streaming.  Gunicorn: 6 workers, gthread class.
 """
 
 import json
+import logging
 import os
 import queue as q_mod
 import threading
@@ -14,6 +15,10 @@ import uuid
 import requests
 import urllib3
 urllib3.disable_warnings()
+
+# Load .env before anything reads os.environ (no-op when file is absent)
+from dotenv import load_dotenv
+load_dotenv()
 
 from flask import Flask, Response, jsonify, render_template, request
 
@@ -33,28 +38,44 @@ from gateways.utils      import (
     session_id,
 )
 
+# ── Logging ───────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("eonx_checker")
 
-BOT_TOKEN = "7931020665:AAHPFFWk6ejfwl6qIQOfEi12y7f31Iec7QA"
-CHAT_ID   = "-1002391341635"
-TOPIC_ID  = 13497
+# ── Telegram config (loaded from environment) ─────────────────────────────────
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID", "")
+_TOPIC_ID_RAW = os.environ.get("TELEGRAM_TOPIC_ID", "0")
+try:
+    TOPIC_ID = int(_TOPIC_ID_RAW)
+except ValueError:
+    logger.warning(
+        "TELEGRAM_TOPIC_ID='%s' is not a valid integer; defaulting to 0", _TOPIC_ID_RAW
+    )
+    TOPIC_ID = 0
 
 
 def send_telegram(message: str) -> None:
-    """Send message to Telegram group topic."""
+    """Send message to Telegram group topic.  No-op when BOT_TOKEN is unset."""
+    if not BOT_TOKEN:
+        return
     try:
-        requests.get(
+        requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            params={
+            json={
                 "chat_id":                  CHAT_ID,
                 "message_thread_id":        TOPIC_ID,
                 "text":                     message,
                 "parse_mode":               "HTML",
-                "disable_web_page_preview": 1,
+                "disable_web_page_preview": True,
             },
             timeout=10,
         )
     except Exception:
-        pass
+        logger.warning("Telegram notification failed", exc_info=True)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -66,6 +87,9 @@ DEFAULT_THREADS    = 5
 MAX_THREADS        = 10
 JOB_TTL            = 3600   # seconds before completed jobs are reaped
 MAX_CONCURRENT_JOBS = 30   # 30 users max — 30 × 10 threads = 300 concurrent requests
+# Maximum number of result messages buffered per job.  Prevents unbounded memory
+# growth when a client disconnects before consuming all results.
+MAX_JOB_QUEUE_SIZE = 10000
 
 # ── In-memory job store ───────────────────────────────────────────────────────
 JOBS: dict[str, dict] = {}
@@ -102,7 +126,7 @@ def _load_working_sites() -> None:
                         if d:
                             _WORKING_SITES[gateway].add(d)
         except Exception:
-            pass
+            logger.warning("Failed to load working sites for gateway %s", gateway, exc_info=True)
 
 _load_working_sites()
 
@@ -120,22 +144,23 @@ def _save_working_site(domain: str, gateway: str) -> None:
         with open(WORKING_SITES_FILES[gw], "a", encoding="utf-8") as f:
             f.write(domain + "\n")
     except Exception:
-        pass
+        logger.warning("Failed to persist new site %s for gateway %s", domain, gw, exc_info=True)
 
 
 def _remove_working_site(domain: str, gateway: str) -> None:
     """Remove a bad domain from the gateway's working set and rewrite the file.
     Called when a domain triggers a structural site error (not just a proxy error).
+    The file write is kept inside the lock to prevent concurrent write races.
     """
     gw = gateway if gateway in _WORKING_SITES else "authnet"
     with _SITES_LOCK:
         _WORKING_SITES[gw].discard(domain)
         sites = list(_WORKING_SITES[gw])
-    try:
-        with open(WORKING_SITES_FILES[gw], "w", encoding="utf-8") as f:
-            f.write("\n".join(sites) + ("\n" if sites else ""))
-    except Exception:
-        pass
+        try:
+            with open(WORKING_SITES_FILES[gw], "w", encoding="utf-8") as f:
+                f.write("\n".join(sites) + ("\n" if sites else ""))
+        except Exception:
+            logger.warning("Failed to persist removed site %s for gateway %s", domain, gw, exc_info=True)
 
 # ── Job reaper ────────────────────────────────────────────────────────────────
 def _reaper() -> None:
@@ -402,6 +427,8 @@ def _scan_worker(
             t.join()
 
         job["status"] = "done"
+        logger.info("Job %s finished: live=%d dead=%d unknown=%d",
+                    job_id, job["live"], job["dead"], job["unknown"])
         job["queue"].put(json.dumps({
             "type":    "done",
             "total":   job["total"],
@@ -416,6 +443,13 @@ def _scan_worker(
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
+
+@app.route("/health")
+def health():
+    """Liveness probe — returns 200 with basic runtime stats."""
+    active = sum(1 for j in JOBS.values() if j.get("status") == "running")
+    return jsonify({"status": "ok", "active_jobs": active})
+
 
 @app.route("/")
 def index():
@@ -497,9 +531,12 @@ def scan():
         "dead":       0,
         "unknown":    0,
         "bad_count":  0,
-        "queue":      q_mod.Queue(),
+        "queue":      q_mod.Queue(maxsize=MAX_JOB_QUEUE_SIZE),
         "created_at": time.time(),
     }
+
+    logger.info("Job %s started: gateway=%s cards=%d domains=%d threads=%d",
+                job_id, gateway, len(cards), len(domains), num_threads)
 
     threading.Thread(
         target=_scan_worker,
