@@ -369,7 +369,7 @@ def check_pymntpl(session: requests.Session, domain: str, card_tuple: tuple, **k
                     "card": {
                         "number":        cc,
                         "expiry":        expiry,
-                        "security_code": cvv,
+                        "security_code": cvv if cvv else "",
                         "name":          f"{ident['fname']} {ident['lname']}",
                         "billing_address": {
                             "address_line_1": ident["street"],
