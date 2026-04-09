@@ -16,6 +16,10 @@ import requests
 import urllib3
 urllib3.disable_warnings()
 
+# Load .env before anything reads os.environ (no-op when file is absent)
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, Response, jsonify, render_template, request
 
 from gateways.authnetcim import check_authnet

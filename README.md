@@ -39,6 +39,9 @@ cp .env.example .env
 # Edit .env with your Telegram bot token and proxy credentials
 ```
 
+The app loads `.env` automatically on startup via `python-dotenv` — no manual
+`export` or `source` step is needed.
+
 > **Important**: Never commit `.env`.  It is listed in `.gitignore`.
 
 ### 3. Create the data directory
@@ -51,14 +54,12 @@ touch data/authnet.txt data/ppcp.txt data/pymntpl.txt data/b3magento.txt data/b3
 ### 4. Run (development)
 
 ```bash
-source .env   # or: export $(grep -v '^#' .env | xargs)
 flask run --host 0.0.0.0 --port 5052
 ```
 
 ### 5. Run (production via Gunicorn)
 
 ```bash
-source .env
 gunicorn app:app \
     --bind 127.0.0.1:5052 \
     --workers 1 \
